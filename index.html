@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Absensi Wajah</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        background-color: #f4f4f9;
+        padding: 20px;
+        margin: 0;
+      }
+      .container {
+        max-width: 400px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      video {
+        width: 100%;
+        border-radius: 10px;
+        background: #000;
+      }
+      input {
+        width: 90%;
+        padding: 10px;
+        margin-top: 15px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 16px;
+      }
+      .btn-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+      }
+      button {
+        flex: 1;
+        padding: 15px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        color: white;
+      }
+      #btn-register {
+        background-color: #007bff;
+      }
+      #btn-absen {
+        background-color: #28a745;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Sistem Absensi AI</h2>
+      <video id="kamera" autoplay playsinline></video>
+      <canvas id="canvas" style="display: none"></canvas>
+
+      <input type="text" id="nama" placeholder="Masukkan Nama (Khusus Register)" />
+
+      <div class="btn-group">
+        <button id="btn-register">Register</button>
+        <button id="btn-absen">Absen Masuk</button>
+      </div>
+    </div>
+
+    <script>
+      const video = document.getElementById("kamera");
+      const canvas = document.getElementById("canvas");
+
+      // Nyalakan kamera
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "user" }, audio: false })
+        .then((stream) => {
+          video.srcObject = stream;
+        })
+        .catch((err) => alert("Kamera gagal diakses: " + err));
+
+      // Fungsi umum untuk mengambil foto & mengirim ke endpoint
+      function kirimKeServer(endpoint) {
+        const nama = document.getElementById("nama").value;
+        if (endpoint === "/api/register" && !nama) {
+          return alert("Isi nama dulu untuk mendaftar!");
+        }
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+
+        canvas.toBlob(
+          async (blob) => {
+            const formData = new FormData();
+            formData.append("image", blob, "foto.jpg");
+            if (nama) formData.append("nama", nama);
+
+            try {
+              const res = await fetch("http://localhost:5000" + endpoint, {
+                method: "POST",
+                body: formData,
+              });
+              const data = await res.json();
+
+              if (res.ok) alert("Sukses: " + data.pesan);
+              else alert("Gagal: " + data.error);
+            } catch (err) {
+              alert("Koneksi ke server gagal.");
+            }
+          },
+          "image/jpeg",
+          0.9,
+        );
+      }
+
+      document.getElementById("btn-register").addEventListener("click", () => kirimKeServer("/api/register"));
+      document.getElementById("btn-absen").addEventListener("click", () => kirimKeServer("/api/absen"));
+    </script>
+  </body>
+</html>
