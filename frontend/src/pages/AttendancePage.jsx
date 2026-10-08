@@ -153,7 +153,7 @@ export default function AttendancePage() {
             {message}
           </p>
         )}
-        <a href="/dashboard.html" className="mt-6 block text-center text-sm font-medium text-blue-700 hover:underline">
+        <a href="/dashboard" className="mt-6 block text-center text-sm font-medium text-blue-700 hover:underline">
           Lihat log aktivitas
         </a>
       </section>

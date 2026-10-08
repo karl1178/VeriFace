@@ -19,8 +19,8 @@ echo Menunggu server siap...
 timeout /t 3 >nul
 
 echo Membuka Browser...
-start http://localhost:5173
-start http://localhost:5173/dashboard.html
+start http://localhost:5173/scanner
+start http://localhost:5173/dashboard
 
 echo.
 echo Selesai! Semua server berjalan di latar (Minimize).
