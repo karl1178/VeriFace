@@ -8,7 +8,7 @@ export default function AttendancePage() {
   const [name, setName] = useState("");
   const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("info");
+  const [messageType, setMessageType] = useState("error");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -79,10 +79,10 @@ export default function AttendancePage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Permintaan gagal.");
 
-      setMessage(`Sukses: ${data.pesan}`);
+      setMessage(`${data.pesan}`);
       setMessageType("success");
     } catch (error) {
-      setMessage(error.message || "Koneksi ke server gagal.");
+      setMessage(error instanceof Error ? error.message : "Koneksi ke server gagal.");
       setMessageType("error");
     } finally {
       setSubmitting(false);
@@ -90,27 +90,21 @@ export default function AttendancePage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <section className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-9">
-        <div className="mb-6 text-center">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">VeriFace</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sistem Absensi AI</h1>
-          <p className="mt-2 text-slate-500">Daftarkan wajah atau lakukan absensi dengan kamera.</p>
-        </div>
-
+    <main className="flex min-h-screen items-center justify-center bg-[#f5f7f5] px-4 py-8 text-[#202c26]">
+      <section className="w-full max-w-lg rounded-xl border border-[#e7ebe7] bg-white p-5 shadow-sm sm:p-7">
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          className="aspect-video w-full rounded-2xl bg-slate-950 object-cover"
+          className="aspect-video w-full rounded-lg bg-[#202c26] object-cover"
           aria-label="Pratinjau kamera"
         />
         <canvas ref={canvasRef} className="hidden" />
 
-        {cameraError && <p className="mt-3 text-sm text-red-600" role="alert">{cameraError}</p>}
+        {cameraError && <p className="mt-3 text-sm text-[#a85749]" role="alert">{cameraError}</p>}
 
-        <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="nama">
-          Nama karyawan <span className="font-normal text-slate-400">(diperlukan untuk register)</span>
+        <label className="mt-5 block text-sm font-medium text-[#344139]" htmlFor="nama">
+          Nama (hanya untuk register)
         </label>
         <input
           id="nama"
@@ -118,7 +112,7 @@ export default function AttendancePage() {
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Masukkan nama"
-          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          className="mt-2 w-full rounded-md border border-[#dfe5df] px-3 py-2.5 text-sm text-[#202c26] outline-none transition placeholder:text-[#a0a8a2] focus:border-[#397553] focus:ring-2 focus:ring-[#edf4ef]"
         />
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -126,7 +120,7 @@ export default function AttendancePage() {
             type="button"
             disabled={submitting}
             onClick={() => sendToServer("/api/register")}
-            className="rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md bg-[#397553] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-wait disabled:opacity-60"
           >
             Register wajah
           </button>
@@ -134,27 +128,25 @@ export default function AttendancePage() {
             type="button"
             disabled={submitting}
             onClick={() => sendToServer("/api/absen")}
-            className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md border border-[#dfe5df] bg-white px-4 py-3 text-sm font-semibold text-[#397553] transition hover:bg-[#edf4ef] disabled:cursor-wait disabled:opacity-60"
           >
             Absen masuk
           </button>
         </div>
         {message && (
           <p
-            role="status"
-            className={`mt-4 rounded-xl px-4 py-3 text-sm ${
-              messageType === "error"
-                ? "bg-red-50 text-red-700"
-                : messageType === "success"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-blue-50 text-blue-700"
+            role="alert"
+            className={`mt-4 rounded-md px-3 py-2.5 text-sm ${
+              messageType === "success"
+                ? "bg-[#edf5ef] text-[#397553]"
+                : "bg-[#fbefed] text-[#a85749]"
             }`}
           >
             {message}
           </p>
         )}
-        <a href="/dashboard" className="mt-6 block text-center text-sm font-medium text-blue-700 hover:underline">
-          Lihat log aktivitas
+        <a href="/dashboard" className="mt-5 block text-center text-xs font-medium text-[#748078] hover:text-[#397553] hover:underline">
+          Kembali ke Dashboard
         </a>
       </section>
     </main>

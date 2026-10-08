@@ -13,6 +13,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentDate, setCurrentDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredLogs = logs.filter((log) =>
+    log.nama?.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -121,10 +125,17 @@ export default function DashboardPage() {
                 >
                   <img src={refreshIcon} className="h-4 w-4 shrink-0" alt="" aria-hidden="true" />
                 </button>
-                <div className="flex h-[30px] w-[203px] items-center gap-2 rounded-md border border-[#e7ebe7] px-[10px] text-[9px] text-[#a0a8a2] max-[650px]:w-[150px] max-[650px]:shrink-0">
+                <label className="flex h-[30px] w-[203px] items-center gap-2 rounded-md border border-[#e7ebe7] px-[10px] text-[9px] text-[#a0a8a2] max-[650px]:w-[150px] max-[650px]:shrink-0">
                   <img src={searchIcon} className="h-3 w-3 shrink-0" alt="" aria-hidden="true" />
-                  Cari karyawan
-                </div>
+                  <input
+                    type="search"
+                    aria-label="Cari berdasarkan nama"
+                    placeholder="Cari karyawan"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="min-w-0 flex-1 bg-transparent text-[10px] text-[#344139] outline-none placeholder:text-[#a0a8a2]"
+                  />
+                </label>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -144,8 +155,10 @@ export default function DashboardPage() {
                     <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#b5473a]">{error}</td></tr>
                   ) : logs.length === 0 ? (
                     <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#89938c]">Belum ada aktivitas yang tercatat.</td></tr>
+                  ) : filteredLogs.length === 0 ? (
+                    <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#89938c]">Tidak ada karyawan dengan nama tersebut.</td></tr>
                   ) : (
-                    logs.map((log, index) => (
+                    filteredLogs.map((log, index) => (
                       <tr key={`${log.waktu}-${log.nama}-${index}`} className="transition-colors hover:bg-[#fafbfa]">
                         <td className="border-b border-[#edf0ed] py-[10px] pr-4 pl-[21px] text-[10px] text-[#748078]">
                           <div className="flex items-center gap-[10px]">
@@ -171,7 +184,7 @@ export default function DashboardPage() {
             </div>
             <footer className="border-t border-[#edf0ed] px-[21px] py-3">
               <a href="/scanner" className="text-[10px] font-semibold text-[#397553] no-underline hover:underline">
-                Kembali ke absensi
+                Buka Halaman Absensi
               </a>
             </footer>
           </section>
