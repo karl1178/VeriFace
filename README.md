@@ -1,5 +1,12 @@
 # Sistem Absensi Wajah AI
 
+## Struktur Proyek
+
+- `ai-service/`: layanan ekstraksi fitur wajah (FastAPI).
+- `backend/`: API Express, migrasi database, dan dependensi Node.js.
+- `frontend/`: halaman web absensi dan dashboard.
+- `mulai.bat`: menjalankan ketiga layanan di Windows.
+
 ## Persyaratan Sistem
 
 1. Install **Node.js** (v18+)
@@ -8,17 +15,19 @@
 
 ## Cara Instalasi (Lakukan Sekali Saja)
 
-1. **Database:** Buka PostgreSQL (pgAdmin/psql), buat database bernama `absensi_db`. Buat tabel menggunakan query SQL yang ada di file `database.sql` (atau bagikan query CREATE TABLE sebelumnya ke tim).
-2. **Setup Backend (Node.js):** Buka terminal di folder ini, jalankan `npm install`. Jangan lupa sesuaikan password PostgreSQL di file `server.js`.
+1. **Database:** Buka PostgreSQL (pgAdmin/psql), buat database bernama `absensi_db` dan pastikan tabel `karyawan` serta `log_absen` tersedia.
+2. **Setup Backend (Node.js):** Dari folder proyek, jalankan `npm --prefix backend install`. Sesuaikan konfigurasi PostgreSQL di `backend/server.js`.
 3. **Setup AI (Python):**
-   - Buka terminal, buat environment baru: `python -m venv venv`
+   - Dari folder proyek, buat environment baru: `python -m venv venv`
    - Aktifkan venv: `venv\Scripts\activate` (Windows)
-   - Install library: `pip install -r requirements.txt`
+   - Install library: `pip install -r ai-service\requirements.txt`
 
 ## Cara Menjalankan
 
-Cukup double-click file `Mulai-Absensi.bat` (khusus Windows), atau jalankan 3 server secara manual:
+Cukup double-click `mulai.bat` (khusus Windows), atau jalankan 3 server secara manual dari folder proyek:
 
-1. `uvicorn main:app` (Server AI)
-2. `node server.js` (Server Backend)
-3. `python -m http.server 3000` (Server Web)
+1. `venv\Scripts\python -m uvicorn main:app --app-dir ai-service` (Server AI)
+2. `npm --prefix backend start` (Server Backend)
+3. `python -m http.server 3000 --directory frontend` (Server Web)
+
+Buka `http://localhost:3000` untuk absensi dan `http://localhost:3000/dashboard.html` untuk dashboard.

@@ -9,7 +9,7 @@ const crypto = require("crypto"); // Modul Kriptografi bawaan Node.js
 // --- KONFIGURASI KRIPTOGRAFI AES-256-CBC ---
 const ALGORITHM = "aes-256-cbc";
 // Kunci rahasia harus 32 karakter (256 bit). Di dunia nyata, ini disimpan di file .env
-const SECRET_KEY = crypto.createHash("sha256").update("KunciRahasiaVeriFaceTugasKripto").digest("base").substring(0, 32);
+const SECRET_KEY = crypto.createHash("sha256").update("KunciRahasiaVeriFaceTugasKripto").digest("base64").substring(0, 32);
 
 // Fungsi Enkripsi
 function encryptData(text) {
@@ -57,7 +57,8 @@ app.get("/api/logs", async (req, res) => {
     const result = await pool.query("SELECT TO_CHAR(waktu, 'DD/MM/YYYY HH24:MI:SS') as waktu, nama, aktivitas, status FROM log_absen ORDER BY id DESC");
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: "Gagal mengambil log" });
+    console.error("DATABASE ERROR:", err.message); // <-- Add this line!
+    res.status(500).json({ error: "Gagal mengambil log dari database" });
   }
 });
 
