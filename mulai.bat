@@ -12,15 +12,15 @@ echo [2/3] Menyalakan Server Utama (Express)...
 start "Server Express (Node.js)" /MIN cmd /k "cd /d ""%~dp0backend"" && npm start"
 
 echo [3/3] Menyalakan Web Frontend...
-start "Web Server (Python)" /MIN cmd /k "python -m http.server 3000 --directory ""%~dp0frontend"""
+start "Web Server (Vite)" /MIN cmd /k "cd /d ""%~dp0frontend"" && npm run dev -- --host 0.0.0.0"
 
 echo.
 echo Menunggu server siap...
 timeout /t 3 >nul
 
 echo Membuka Browser...
-start http://localhost:3000
-start http://localhost:3000/dashboard.html
+start http://localhost:5173
+start http://localhost:5173/dashboard.html
 
 echo.
 echo Selesai! Semua server berjalan di latar (Minimize).
