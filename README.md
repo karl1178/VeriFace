@@ -4,7 +4,7 @@
 
 - `ai-service/`: layanan ekstraksi fitur wajah (FastAPI).
 - `backend/`: API Express, migrasi database, dan dependensi Node.js.
-- `frontend/`: halaman web absensi dan dashboard.
+- `frontend/`: aplikasi React dan Tailwind CSS untuk absensi dan dashboard.
 - `mulai.bat`: menjalankan ketiga layanan di Windows.
 
 ## Persyaratan Sistem
@@ -17,7 +17,8 @@
 
 1. **Database:** Buka PostgreSQL (pgAdmin/psql), buat database bernama `absensi_db` dan pastikan tabel `karyawan` serta `log_absen` tersedia.
 2. **Setup Backend (Node.js):** Dari folder proyek, jalankan `npm --prefix backend install`. Sesuaikan konfigurasi PostgreSQL di `backend/server.js`.
-3. **Setup AI (Python):**
+3. **Setup Frontend (React + Tailwind CSS):** Dari folder proyek, jalankan `npm --prefix frontend install`.
+4. **Setup AI (Python):**
    - Dari folder proyek, buat environment baru: `python -m venv venv`
    - Aktifkan venv: `venv\Scripts\activate` (Windows)
    - Install library: `pip install -r ai-service\requirements.txt`
@@ -28,6 +29,8 @@ Cukup double-click `mulai.bat` (khusus Windows), atau jalankan 3 server secara m
 
 1. `venv\Scripts\python -m uvicorn main:app --app-dir ai-service` (Server AI)
 2. `npm --prefix backend start` (Server Backend)
-3. `python -m http.server 3000 --directory frontend` (Server Web)
+3. `npm --prefix frontend run dev` (Server Web)
 
-Buka `http://localhost:3000` untuk absensi dan `http://localhost:3000/dashboard.html` untuk dashboard.
+Buka `http://localhost:5173` untuk absensi dan `http://localhost:5173/dashboard.html` untuk dashboard.
+
+Untuk membuat build produksi frontend, jalankan `npm --prefix frontend run build`. Hasil build tersedia di `frontend/dist/`.
