@@ -31,6 +31,6 @@ Cukup double-click `mulai.bat` (khusus Windows), atau jalankan 3 server secara m
 2. `npm --prefix backend start` (Server Backend)
 3. `npm --prefix frontend run dev` (Server Web)
 
-Buka `http://localhost:5173` untuk absensi dan `http://localhost:5173/dashboard.html` untuk dashboard.
+Buka `http://localhost:5173/scanner` untuk web absensi dan `http://localhost:5173/dashboard` untuk dashboard. Alamat `http://localhost:5173` akan mengarahkan ke `/scanner`.
 
 Untuk membuat build produksi frontend, jalankan `npm --prefix frontend run build`. Hasil build tersedia di `frontend/dist/`.
