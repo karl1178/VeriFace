@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import AttendancePage from "./pages/AttendancePage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
-import "./style.css";
+import "./index.css";
 
 const Page = window.location.pathname.endsWith("/dashboard.html") ? DashboardPage : AttendancePage;
 
