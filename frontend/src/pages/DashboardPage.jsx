@@ -5,8 +5,7 @@ import notificationIcon from "../assets/notifications.svg";
 import searchIcon from "../assets/search.svg";
 import adminIcon from "../assets/admin.svg";
 import refreshIcon from "../assets/reset.svg"
-
-const API_URL = "http://localhost:5000";
+import { apiRequest } from "../api.js";
 
 export default function DashboardPage() {
   const [logs, setLogs] = useState([]);
@@ -22,9 +21,7 @@ export default function DashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`${API_URL}/api/logs`);
-      if (!response.ok) throw new Error("Gagal mengambil data aktivitas.");
-      const data = await response.json();
+      const data = await apiRequest("/api/logs");
       if (!Array.isArray(data)) throw new Error("Format data log tidak valid.");
       setLogs(data);
     } catch (requestError) {
@@ -65,6 +62,13 @@ export default function DashboardPage() {
             <img src={dashboardIcon} className="h-[18px] w-[18px] shrink-0" alt="" aria-hidden="true" />
             Dashboard
           </a>
+          <a
+            href="/manage"
+            className="mt-1 flex h-[37px] items-center gap-[11px] rounded-md px-[11px] text-xs font-medium text-[#748078] no-underline transition hover:bg-[#f5f7f5] hover:text-[#28634c] max-[850px]:mt-0 max-[850px]:h-[34px]"
+          >
+            <img src={adminIcon} className="h-[18px] w-[18px] shrink-0" alt="" aria-hidden="true" />
+            Kelola Karyawan
+          </a>
         </nav>
 
         <div className="mt-auto max-[850px]:hidden">
@@ -86,7 +90,7 @@ export default function DashboardPage() {
         <header className="flex min-h-[84px] items-center justify-between gap-4 border-b border-[#e7ebe7] bg-white px-9 py-[14px] max-[1100px]:px-6 max-[650px]:min-h-[74px] max-[650px]:px-[17px] max-[650px]:py-3">
           <div>
             <div className="text-[10px] font-medium text-[#929b95]">
-              Ruang Kerja <span className="px-[7px] text-[#c5cbc6]">/</span> Overview
+              Ruang Kerja <span className="px-[7px] text-[#c5cbc6]">/</span>
             </div>
             <h1 className="mt-1.5 mb-0 text-lg font-semibold tracking-[-0.035em] text-[#202c26]">
               Dashboard
@@ -120,7 +124,7 @@ export default function DashboardPage() {
                   type="button"
                   onClick={fetchLogs}
                   disabled={loading}
-                  className="inline-flex h-[30px] shrink-0 items-center gap-2 rounded-md border border-[#dfe5df] bg-white px-2 text-[10px] font-semibold text-[#405047] transition hover:bg-[#f8faf8] disabled:cursor-wait disabled:opacity-[0.65]"
+                  className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-[#dfe5df] bg-white text-[10px] font-semibold text-[#405047] transition hover:bg-[#f8faf8] disabled:cursor-wait disabled:opacity-[0.65]"
                   title="Segarkan data kehadiran"
                 >
                   <img src={refreshIcon} className="h-4 w-4 shrink-0" alt="" aria-hidden="true" />
