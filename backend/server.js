@@ -43,6 +43,7 @@ const pool = new Pool({
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
 function hitungJarak(vektor1, vektor2) {
@@ -59,6 +60,45 @@ app.get("/api/logs", async (req, res) => {
   } catch (err) {
     console.error("DATABASE ERROR:", err.message); // <-- Add this line!
     res.status(500).json({ error: "Gagal mengambil log dari database" });
+  }
+});
+
+// MANAJEMEN KARYAWAN
+app.get("/api/employees", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, nama FROM karyawan ORDER BY nama ASC, id ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal mengambil data karyawan dari database" });
+  }
+});
+
+app.patch("/api/employees/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const nama = typeof req.body?.nama === "string" ? req.body.nama.trim() : "";
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "ID karyawan tidak valid" });
+  if (!nama) return res.status(400).json({ error: "Nama karyawan wajib diisi" });
+  try {
+    const result = await pool.query("UPDATE karyawan SET nama = $1 WHERE id = $2 RETURNING id, nama", [nama, id]);
+    if (!result.rowCount) return res.status(404).json({ error: "Karyawan tidak ditemukan" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal memperbarui nama karyawan" });
+  }
+});
+
+app.delete("/api/employees/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "ID karyawan tidak valid" });
+  try {
+    const result = await pool.query("DELETE FROM karyawan WHERE id = $1 RETURNING id", [id]);
+    if (!result.rowCount) return res.status(404).json({ error: "Karyawan tidak ditemukan" });
+    res.json({ pesan: "Data karyawan berhasil dihapus" });
+  } catch (err) {
+    console.error("DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal menghapus karyawan dari database" });
   }
 });
 

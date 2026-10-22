@@ -21,5 +21,30 @@ body {
 
 button,
 input {
-  font: inherit;
+  font-family: inherit;
+}
+
+.scanner-toast {
+  animation: scanner-toast-slide 3s ease-in-out forwards;
+}
+
+@keyframes scanner-toast-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(-120%);
+  }
+  8%, 86% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-toast {
+    animation-duration: 3s;
+  }
 }
