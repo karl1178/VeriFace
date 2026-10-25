@@ -15,7 +15,7 @@
 
 ## Cara Instalasi (Lakukan Sekali Saja)
 
-1. **Database:** Buka PostgreSQL (pgAdmin/psql), buat database bernama `absensi_db` dan pastikan tabel `karyawan` serta `log_absen` tersedia.
+1. **Database:** Buat database bernama `absensi_db`, lalu dari folder proyek jalankan `psql -U postgres -d absensi_db -f backend/schema.sql`. Schema ini membuat tabel `karyawan`, `log_absen`, dan `pengaturan_absensi`; setiap log menyimpan `karyawan_id`, bukan salinan nama. Nama pada riwayat ditampilkan dari data karyawan saat ini. Status waktu absensi (`status_kehadiran`: `awal` atau `terlambat`) disimpan saat scan sehingga perubahan batas jam masuk tidak mengubah log lama. Batas awalnya 07:00 pada zona waktu Asia/Jakarta dan dapat diubah dari Kelola Karyawan. Penghapusan karyawan melalui aplikasi mengarsipkannya agar riwayat absensi tetap terhubung.
 2. **Setup Backend (Node.js):** Dari folder proyek, jalankan `npm --prefix backend install`. Sesuaikan konfigurasi PostgreSQL di `backend/server.js`.
 3. **Setup Frontend (React + Tailwind CSS):** Dari folder proyek, jalankan `npm --prefix frontend install`.
 4. **Setup AI (Python):**

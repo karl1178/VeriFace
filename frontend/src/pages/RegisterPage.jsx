@@ -5,6 +5,7 @@ export default function RegisterPage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [name, setName] = useState("");
+  const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
@@ -22,7 +23,11 @@ export default function RegisterPage() {
           return;
         }
         stream = cameraStream;
-        if (videoRef.current) videoRef.current.srcObject = cameraStream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = cameraStream;
+          await videoRef.current.play();
+          if (active) setCameraReady(true);
+        }
       } catch (error) {
         if (active) setCameraError(`Kamera gagal diakses: ${error.message}`);
       }
@@ -43,7 +48,7 @@ export default function RegisterPage() {
     }
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || !video.videoWidth) {
+    if (!video || !canvas || !video.videoWidth || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       setMessage("Kamera belum siap. Periksa izin kamera lalu coba lagi.");
       setMessageType("error");
       return;
@@ -88,14 +93,14 @@ export default function RegisterPage() {
           <h1 className="mt-4 mb-1 text-lg font-semibold tracking-[-0.035em]">Registrasi Wajah</h1>
           <p className="m-0 text-xs text-[#89938c]">Posisikan wajah di depan kamera untuk mendaftarkan karyawan.</p>
         </div>
-        <video ref={videoRef} autoPlay playsInline className="aspect-video w-full rounded-lg bg-[#202c26] object-cover -scale-x-100" aria-label="Pratinjau kamera" />
+        <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full rounded-lg bg-[#202c26] object-cover -scale-x-100" aria-label="Pratinjau kamera" />
         <canvas ref={canvasRef} className="hidden" />
         {cameraError && <p className="mt-3 text-sm text-[#a85749]" role="alert">{cameraError}</p>}
         <form onSubmit={registerFace}>
           <label className="mt-5 block text-sm font-medium text-[#344139]" htmlFor="nama">Nama karyawan</label>
           <input id="nama" type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Masukkan nama" autoComplete="name" required className="mt-2 w-full rounded-md border border-[#dfe5df] px-3 py-2.5 text-sm text-[#202c26] outline-none transition placeholder:text-[#a0a8a2] focus:border-[#397553] focus:ring-2 focus:ring-[#edf4ef]" />
-          <button type="submit" disabled={submitting || Boolean(cameraError)} className="mt-4 w-full rounded-md bg-[#397553] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-wait disabled:opacity-60">
-            {submitting ? "Mendaftarkan..." : "Register wajah"}
+          <button type="submit" disabled={submitting || Boolean(cameraError) || !cameraReady} className="mt-4 w-full rounded-md bg-[#397553] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-wait disabled:opacity-60">
+            {submitting ? "Mendaftarkan..." : cameraReady ? "Register wajah" : "Menyiapkan kamera..."}
           </button>
         </form>
         {message && <p role="status" className={`mt-4 rounded-md px-3 py-2.5 text-sm ${messageType === "success" ? "bg-[#edf5ef] text-[#397553]" : "bg-[#fbefed] text-[#a85749]"}`}>{message}</p>}

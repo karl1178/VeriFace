@@ -14,6 +14,11 @@ export default function ManageEmployeesPage() {
   const [notice, setNotice] = useState("");
   const [deletePending, setDeletePending] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [jamMasuk, setJamMasuk] = useState("07:00");
+  const [zonaWaktu, setZonaWaktu] = useState("Asia/Jakarta");
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
   const filteredEmployees = employees.filter((employee) =>
     employee.nama?.toLowerCase().includes(searchQuery.trim().toLowerCase())
   );
@@ -32,7 +37,44 @@ export default function ManageEmployeesPage() {
     }
   }, []);
 
-  useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
+  const fetchAttendanceSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    setSettingsMessage("");
+    try {
+      const data = await apiRequest("/api/settings/attendance");
+      setJamMasuk(data.jam_masuk);
+      setZonaWaktu(data.zona_waktu);
+    } catch (requestError) {
+      setSettingsMessage(requestError instanceof Error ? requestError.message : "Gagal memuat pengaturan waktu masuk.");
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchAttendanceSettings();
+  }, [fetchEmployees, fetchAttendanceSettings]);
+
+  async function saveAttendanceSettings(event) {
+    event.preventDefault();
+    setSettingsSaving(true);
+    setSettingsMessage("");
+    try {
+      const data = await apiRequest("/api/settings/attendance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jam_masuk: jamMasuk }),
+      });
+      setJamMasuk(data.jam_masuk);
+      setZonaWaktu(data.zona_waktu);
+      setSettingsMessage("Batas waktu masuk berhasil disimpan.");
+    } catch (requestError) {
+      setSettingsMessage(requestError instanceof Error ? requestError.message : "Gagal menyimpan pengaturan waktu masuk.");
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
 
   function selectEmployee(employee) {
     if (selectedId === employee.id) {
@@ -101,6 +143,30 @@ export default function ManageEmployeesPage() {
       <main className="ml-[226px] min-h-screen max-[850px]:ml-0">
         <WorkspaceTopBar title="Kelola Karyawan" />
         <div className="mx-auto w-full max-w-[1440px] px-[34px] pt-[30px] pb-[38px] max-[1100px]:px-6 max-[650px]:px-[15px] max-[650px]:pt-[23px]">
+          <section className="mb-4 rounded-[9px] border border-[#dce9df] bg-white px-5 py-4 max-[650px]:px-4">
+            <form onSubmit={saveAttendanceSettings} className="flex flex-wrap items-end gap-3">
+              <div className="min-w-[200px] flex-1">
+                <h2 className="m-0 text-xs font-semibold text-[#344139]">Batas waktu masuk</h2>
+                <p className="mt-1 mb-2 text-[10px] text-[#89938c]">Scan sebelum batas ini dicatat sebagai lebih awal; tepat pada atau setelahnya dicatat terlambat.</p>
+                <label className="block text-[10px] font-medium text-[#56645b]" htmlFor="jam-masuk">Jam masuk</label>
+                <input
+                  id="jam-masuk"
+                  type="time"
+                  required
+                  value={jamMasuk}
+                  onChange={(event) => setJamMasuk(event.target.value)}
+                  disabled={settingsLoading || settingsSaving}
+                  className="mt-1.5 block h-[36px] rounded-md border border-[#dfe5df] bg-white px-3 text-sm text-[#202c26] outline-none focus:border-[#397553] disabled:opacity-60"
+                />
+                <p className="mt-1 mb-0 text-[10px] text-[#89938c]">Zona waktu: {zonaWaktu}</p>
+              </div>
+              <button type="submit" disabled={settingsLoading || settingsSaving} className="h-[34px] rounded-md bg-[#397553] px-3 text-[10px] font-semibold text-white hover:bg-[#28634c] disabled:opacity-60">
+                {settingsSaving ? "Menyimpan..." : "Simpan Batas Waktu"}
+              </button>
+            </form>
+            {settingsMessage && <p role="status" className={`mt-3 mb-0 text-[10px] ${settingsMessage.includes("berhasil") ? "text-[#397553]" : "text-[#a85749]"}`}>{settingsMessage}</p>}
+          </section>
+
           <section className="mb-4 flex items-center justify-between gap-4 rounded-[9px] border border-[#dce9df] bg-white px-5 py-4 max-[650px]:items-start max-[650px]:px-4">
             <div>
               <h2 className="m-0 text-xs font-semibold text-[#344139]">Tambah karyawan</h2>
