@@ -25,11 +25,13 @@
 
 ## Cara Menjalankan
 
-Cukup double-click `mulai.bat` (khusus Windows), atau jalankan 3 server secara manual dari folder proyek:
+Cukup double-click `mulai.bat` (khusus Windows). Script menunggu Server AI siap sebelum menyalakan backend dan frontend. Atau jalankan 3 server secara manual dari folder proyek, masing-masing di terminal terpisah:
 
-1. `venv\Scripts\python -m uvicorn main:app --app-dir ai-service` (Server AI)
-2. `npm --prefix backend start` (Server Backend)
-3. `npm --prefix frontend run dev` (Server Web)
+1. `venv\Scripts\python -m uvicorn main:app --app-dir ai-service` (Server AI). Tunggu sampai server berjalan di `http://127.0.0.1:8000`.
+2. `npm --prefix backend start` (Server Backend).
+3. `npm --prefix frontend run dev` (Server Web).
+
+Biarkan ketiga terminal tetap berjalan. Jika backend menampilkan bahwa layanan AI tidak aktif, pastikan Server AI sudah berjalan di port 8000 sebelum mengulangi permintaan.
 
 Buka `http://localhost:5173/scanner` untuk web absensi dan `http://localhost:5173/dashboard` untuk dashboard. Alamat `http://localhost:5173` akan mengarahkan ke `/scanner`.
 

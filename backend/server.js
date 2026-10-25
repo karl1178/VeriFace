@@ -52,6 +52,16 @@ function hitungJarak(vektor1, vektor2) {
   return Math.sqrt(sum);
 }
 
+function handleBackendError(error, res) {
+  if (error.code === "ECONNREFUSED" && error.config?.url?.startsWith("http://127.0.0.1:8000/")) {
+    console.error("AI SERVICE ERROR: Layanan AI tidak aktif di http://127.0.0.1:8000");
+    return res.status(503).json({ error: "Layanan AI tidak aktif. Jalankan server AI di http://127.0.0.1:8000 lalu coba lagi." });
+  }
+
+  console.error("Error backend:", error);
+  return res.status(500).json({ error: "Terjadi kesalahan sistem" });
+}
+
 // AMBIL DATA LOG (DASHBOARD)
 app.get("/api/logs", async (req, res) => {
   try {
@@ -191,8 +201,7 @@ app.post("/api/register", upload.single("image"), async (req, res) => {
       res.status(400).json({ error: dataAI.message });
     }
   } catch (error) {
-    console.error("Error backend:", error);
-    res.status(500).json({ error: "Terjadi kesalahan sistem" });
+    handleBackendError(error, res);
   }
 });
 
@@ -238,19 +247,55 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
       }
 
       if (karyawanDikenali) {
-        const attendanceResult = await pool.query(
-          `INSERT INTO log_absen (karyawan_id, aktivitas, status_proses, status_kehadiran)
-           SELECT $1, $2, 'Sukses',
-             CASE
-               WHEN (NOW() AT TIME ZONE pengaturan_absensi.zona_waktu)::time < pengaturan_absensi.jam_masuk
-                 THEN 'awal'
-               ELSE 'terlambat'
-             END
-           FROM pengaturan_absensi
-           WHERE pengaturan_absensi.id = 1`,
-          [karyawanDikenali.id, "Absen Masuk"],
-        );
-        if (!attendanceResult.rowCount) throw new Error("Pengaturan waktu absensi belum tersedia di database");
+        const client = await pool.connect();
+        let transactionStarted = false;
+        try {
+          await client.query("BEGIN");
+          transactionStarted = true;
+          await client.query("SELECT id FROM karyawan WHERE id = $1 FOR UPDATE", [karyawanDikenali.id]);
+
+          const existingAttendance = await client.query(
+            `SELECT 1
+             FROM log_absen AS log
+             CROSS JOIN pengaturan_absensi
+             WHERE log.karyawan_id = $1
+               AND log.aktivitas = 'Absen Masuk'
+               AND log.status_proses = 'Sukses'
+               AND pengaturan_absensi.id = 1
+               AND (log.waktu AT TIME ZONE pengaturan_absensi.zona_waktu)::date =
+                   (NOW() AT TIME ZONE pengaturan_absensi.zona_waktu)::date
+             LIMIT 1`,
+            [karyawanDikenali.id],
+          );
+
+          if (existingAttendance.rowCount) {
+            await client.query("COMMIT");
+            transactionStarted = false;
+            return res.json({ pesan: `${karyawanDikenali.nama} sudah melakukan absensi hari ini.` });
+          }
+
+          const attendanceResult = await client.query(
+            `INSERT INTO log_absen (karyawan_id, aktivitas, status_proses, status_kehadiran)
+             SELECT $1, $2, 'Sukses',
+               CASE
+                 WHEN (NOW() AT TIME ZONE pengaturan_absensi.zona_waktu)::time < pengaturan_absensi.jam_masuk
+                   THEN 'awal'
+                 ELSE 'terlambat'
+               END
+             FROM pengaturan_absensi
+             WHERE pengaturan_absensi.id = 1`,
+            [karyawanDikenali.id, "Absen Masuk"],
+          );
+          if (!attendanceResult.rowCount) throw new Error("Pengaturan waktu absensi belum tersedia di database");
+
+          await client.query("COMMIT");
+          transactionStarted = false;
+        } catch (error) {
+          if (transactionStarted) await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
         res.json({ pesan: `Absen berhasil! Selamat bekerja, ${karyawanDikenali.nama}.` });
       } else {
         await pool.query(
@@ -263,8 +308,7 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
       res.status(400).json({ error: dataAI.message });
     }
   } catch (error) {
-    console.error("Error backend:", error);
-    res.status(500).json({ error: "Terjadi kesalahan sistem" });
+    handleBackendError(error, res);
   }
 });
 
