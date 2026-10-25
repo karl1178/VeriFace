@@ -55,7 +55,19 @@ function hitungJarak(vektor1, vektor2) {
 // AMBIL DATA LOG (DASHBOARD)
 app.get("/api/logs", async (req, res) => {
   try {
-    const result = await pool.query("SELECT TO_CHAR(waktu, 'DD/MM/YYYY HH24:MI:SS') as waktu, nama, aktivitas, status FROM log_absen ORDER BY id DESC");
+    const result = await pool.query(`
+      SELECT
+        TO_CHAR(log.waktu AT TIME ZONE pengaturan_absensi.zona_waktu, 'DD/MM/YYYY HH24:MI:SS') AS waktu,
+        COALESCE(karyawan.nama, 'Tidak Dikenal') AS nama,
+        log.aktivitas,
+        log.status_proses,
+        log.status_kehadiran
+      FROM log_absen AS log
+      LEFT JOIN karyawan ON karyawan.id = log.karyawan_id
+      CROSS JOIN pengaturan_absensi
+      WHERE pengaturan_absensi.id = 1
+      ORDER BY log.waktu DESC, log.id DESC
+    `);
     res.json(result.rows);
   } catch (err) {
     console.error("DATABASE ERROR:", err.message); // <-- Add this line!
@@ -63,10 +75,45 @@ app.get("/api/logs", async (req, res) => {
   }
 });
 
+app.get("/api/settings/attendance", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT TO_CHAR(jam_masuk, 'HH24:MI') AS jam_masuk, zona_waktu
+      FROM pengaturan_absensi
+      WHERE id = 1
+    `);
+    if (!result.rowCount) throw new Error("Pengaturan absensi belum tersedia di database");
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal mengambil pengaturan waktu absensi" });
+  }
+});
+
+app.patch("/api/settings/attendance", async (req, res) => {
+  const jamMasuk = typeof req.body?.jam_masuk === "string" ? req.body.jam_masuk : "";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(jamMasuk)) {
+    return res.status(400).json({ error: "Waktu masuk harus menggunakan format HH:MM" });
+  }
+  try {
+    const result = await pool.query(`
+      UPDATE pengaturan_absensi
+      SET jam_masuk = $1::time
+      WHERE id = 1
+      RETURNING TO_CHAR(jam_masuk, 'HH24:MI') AS jam_masuk, zona_waktu
+    `, [jamMasuk]);
+    if (!result.rowCount) throw new Error("Pengaturan absensi belum tersedia di database");
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal menyimpan pengaturan waktu absensi" });
+  }
+});
+
 // MANAJEMEN KARYAWAN
 app.get("/api/employees", async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, nama FROM karyawan ORDER BY nama ASC, id ASC");
+    const result = await pool.query("SELECT id, nama FROM karyawan WHERE archived_at IS NULL ORDER BY nama ASC, id ASC");
     res.json(result.rows);
   } catch (err) {
     console.error("DATABASE ERROR:", err.message);
@@ -80,7 +127,10 @@ app.patch("/api/employees/:id", async (req, res) => {
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "ID karyawan tidak valid" });
   if (!nama) return res.status(400).json({ error: "Nama karyawan wajib diisi" });
   try {
-    const result = await pool.query("UPDATE karyawan SET nama = $1 WHERE id = $2 RETURNING id, nama", [nama, id]);
+    const result = await pool.query(
+      "UPDATE karyawan SET nama = $1, updated_at = NOW() WHERE id = $2 AND archived_at IS NULL RETURNING id, nama",
+      [nama, id],
+    );
     if (!result.rowCount) return res.status(404).json({ error: "Karyawan tidak ditemukan" });
     res.json(result.rows[0]);
   } catch (err) {
@@ -93,9 +143,12 @@ app.delete("/api/employees/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "ID karyawan tidak valid" });
   try {
-    const result = await pool.query("DELETE FROM karyawan WHERE id = $1 RETURNING id", [id]);
+    const result = await pool.query(
+      "UPDATE karyawan SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND archived_at IS NULL RETURNING id",
+      [id],
+    );
     if (!result.rowCount) return res.status(404).json({ error: "Karyawan tidak ditemukan" });
-    res.json({ pesan: "Data karyawan berhasil dihapus" });
+    res.json({ pesan: "Data karyawan berhasil diarsipkan" });
   } catch (err) {
     console.error("DATABASE ERROR:", err.message);
     res.status(500).json({ error: "Gagal menghapus karyawan dari database" });
@@ -105,7 +158,7 @@ app.delete("/api/employees/:id", async (req, res) => {
 // REGISTER WAJAH (ENKRIPSI SEBELUM DISIMPAN)
 app.post("/api/register", upload.single("image"), async (req, res) => {
   try {
-    const nama = req.body.nama;
+    const nama = typeof req.body?.nama === "string" ? req.body.nama.trim() : "";
     if (!req.file || !nama) return res.status(400).json({ error: "Gambar dan nama wajib diisi" });
 
     const form = new FormData();
@@ -124,8 +177,14 @@ app.post("/api/register", upload.single("image"), async (req, res) => {
       // 3. Bungkus jadi JSON (karena kolom database kita tipe datanya JSON)
       const secureData = JSON.stringify({ cipher: cipherText });
 
-      await pool.query("INSERT INTO karyawan (nama, feature) VALUES ($1, $2)", [nama, secureData]);
-      await pool.query("INSERT INTO log_absen (nama, aktivitas, status) VALUES ($1, $2, $3)", [nama, "Register", "Sukses"]);
+      const employeeResult = await pool.query(
+        "INSERT INTO karyawan (nama, feature) VALUES ($1, $2) RETURNING id",
+        [nama, secureData],
+      );
+      await pool.query(
+        "INSERT INTO log_absen (karyawan_id, aktivitas, status_proses) VALUES ($1, $2, $3)",
+        [employeeResult.rows[0].id, "Register", "Sukses"],
+      );
 
       res.json({ pesan: `Wajah ${nama} berhasil disimpan dengan Enkripsi AES-256!` });
     } else {
@@ -150,10 +209,10 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
 
     if (dataAI.status === "success") {
       const vektorAbsen = dataAI.feature;
-      const dbResult = await pool.query("SELECT nama, feature FROM karyawan");
+      const dbResult = await pool.query("SELECT id, nama, feature FROM karyawan WHERE archived_at IS NULL");
       const databaseKaryawan = dbResult.rows;
 
-      let wajahDikenali = null;
+      let karyawanDikenali = null;
       let jarakTerkecil = 1.0;
 
       for (const karyawan of databaseKaryawan) {
@@ -170,7 +229,7 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
             const jarak = hitungJarak(vektorAbsen, featureDb);
             if (jarak < 0.6 && jarak < jarakTerkecil) {
               jarakTerkecil = jarak;
-              wajahDikenali = karyawan.nama;
+              karyawanDikenali = karyawan;
             }
           }
         } catch (cryptoErr) {
@@ -178,11 +237,26 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
         }
       }
 
-      if (wajahDikenali) {
-        await pool.query("INSERT INTO log_absen (nama, aktivitas, status) VALUES ($1, $2, $3)", [wajahDikenali, "Absen Masuk", "Sukses"]);
-        res.json({ pesan: `Absen berhasil! Selamat bekerja, ${wajahDikenali}.` });
+      if (karyawanDikenali) {
+        const attendanceResult = await pool.query(
+          `INSERT INTO log_absen (karyawan_id, aktivitas, status_proses, status_kehadiran)
+           SELECT $1, $2, 'Sukses',
+             CASE
+               WHEN (NOW() AT TIME ZONE pengaturan_absensi.zona_waktu)::time < pengaturan_absensi.jam_masuk
+                 THEN 'awal'
+               ELSE 'terlambat'
+             END
+           FROM pengaturan_absensi
+           WHERE pengaturan_absensi.id = 1`,
+          [karyawanDikenali.id, "Absen Masuk"],
+        );
+        if (!attendanceResult.rowCount) throw new Error("Pengaturan waktu absensi belum tersedia di database");
+        res.json({ pesan: `Absen berhasil! Selamat bekerja, ${karyawanDikenali.nama}.` });
       } else {
-        await pool.query("INSERT INTO log_absen (nama, aktivitas, status) VALUES ($1, $2, $3)", ["Tidak Dikenal", "Absen Masuk", "Gagal"]);
+        await pool.query(
+          "INSERT INTO log_absen (karyawan_id, aktivitas, status_proses) VALUES (NULL, $1, $2)",
+          ["Absen Masuk", "Gagal"],
+        );
         res.status(401).json({ error: "Wajah tidak dikenali." });
       }
     } else {

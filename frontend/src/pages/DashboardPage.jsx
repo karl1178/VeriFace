@@ -42,12 +42,15 @@ export default function DashboardPage() {
         <div className="mx-auto w-full max-w-[1440px] px-[34px] pt-[30px] pb-[38px] max-[1100px]:px-6 max-[650px]:px-[15px] max-[650px]:pt-[23px] max-[650px]:pb-[30px]">
 
           <section className="mt-[14px] overflow-hidden rounded-[9px] border border-[#e7ebe7] bg-white">
-            <div className="flex min-h-[65px] items-center justify-between gap-3 border-b border-[#edf0ed] px-[21px] py-[13px] max-[650px]:pr-[14px] max-[650px]:pl-[14px]">
+            <div className="flex min-h-[65px] items-center justify-between gap-3 border-b border-[#edf0ed] px-[21px] py-[13px] max-[650px]:flex-wrap max-[650px]:pr-[14px] max-[650px]:pl-[14px]">
               <div>
                 <h3 className="m-0 text-xs font-semibold text-[#344139]">Kehadiran terbaru</h3>
                 <p className="mt-[5px] mb-0 text-[10px] text-[#89938c]">Check-in karyawan terbaru hari ini</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 max-[650px]:ml-auto">
+                <a href="/scanner" className="inline-flex h-[34px] shrink-0 items-center justify-center rounded-md bg-[#397553] px-3 text-[10px] font-semibold text-white no-underline hover:bg-[#28634c]">
+                  Buka Scanner
+                </a>
                 <button
                   type="button"
                   onClick={fetchLogs}
@@ -71,54 +74,64 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px] border-collapse text-left">
+              <table className="w-full min-w-[720px] border-collapse text-left">
                 <thead className="bg-[#fafbfa] text-[9px] font-medium text-[#89938c]">
                   <tr>
                     <th className="px-5 py-[9px] pl-[21px] font-medium" scope="col">Karyawan</th>
                     <th className="px-5 py-[9px] font-medium" scope="col">Aktivitas</th>
                     <th className="px-5 py-[9px] font-medium" scope="col">Check-in</th>
                     <th className="px-5 py-[9px] font-medium" scope="col">Status</th>
+                    <th className="px-5 py-[9px] font-medium" scope="col">Status Absensi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#89938c]">Memuat data kehadiran...</td></tr>
+                    <tr><td colSpan="5" className="h-[85px] text-center text-[10px] text-[#89938c]">Memuat data kehadiran...</td></tr>
                   ) : error ? (
-                    <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#b5473a]">{error}</td></tr>
+                    <tr><td colSpan="5" className="h-[85px] text-center text-[10px] text-[#b5473a]">{error}</td></tr>
                   ) : logs.length === 0 ? (
-                    <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#89938c]">Belum ada aktivitas yang tercatat.</td></tr>
+                    <tr><td colSpan="5" className="h-[85px] text-center text-[10px] text-[#89938c]">Belum ada aktivitas yang tercatat.</td></tr>
                   ) : filteredLogs.length === 0 ? (
-                    <tr><td colSpan="4" className="h-[85px] text-center text-[10px] text-[#89938c]">Tidak ada karyawan dengan nama tersebut.</td></tr>
+                    <tr><td colSpan="5" className="h-[85px] text-center text-[10px] text-[#89938c]">Tidak ada karyawan dengan nama tersebut.</td></tr>
                   ) : (
-                    filteredLogs.map((log, index) => (
-                      <tr key={`${log.waktu}-${log.nama}-${index}`} className="transition-colors hover:bg-[#fafbfa]">
-                        <td className="border-b border-[#edf0ed] py-[10px] pr-4 pl-[21px] text-[10px] text-[#748078]">
-                          <div className="flex items-center gap-[10px]">
-                            <span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-full bg-[#dcebe3] text-[8px] font-semibold text-[#35664d]">
-                              {log.nama?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2)}
+                    filteredLogs.map((log, index) => {
+                      const statusAbsensi = log.status_kehadiran === "awal"
+                        ? "Lebih Awal"
+                        : log.status_kehadiran === "terlambat"
+                          ? "Terlambat"
+                          : "-";
+                      const statusProses = log.status_proses === "Sukses" ? "Sukses" : "Tidak Dikenal";
+                      const isSuccess = log.status_proses === "Sukses";
+                      return (
+                        <tr key={`${log.waktu}-${log.nama}-${index}`} className="transition-colors hover:bg-[#fafbfa]">
+                          <td className="border-b border-[#edf0ed] py-[10px] pr-4 pl-[21px] text-[10px] text-[#748078]">
+                            <div className="flex items-center gap-[10px]">
+                              <span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-full bg-[#dcebe3] text-[8px] font-semibold text-[#35664d]">
+                                {log.nama?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2)}
+                              </span>
+                              <strong className="text-[10px] font-semibold text-[#39463f]">{log.nama}</strong>
+                            </div>
+                          </td>
+                          <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">{log.aktivitas}</td>
+                          <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">{log.waktu}</td>
+                          <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">
+                            <span className={`inline-flex items-center gap-[6px] whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-medium ${isSuccess ? "bg-[#edf5ef] text-[#397553]" : "bg-[#fbefed] text-[#a85749]"}`}>
+                              <span className={`h-[6px] w-[6px] rounded-full ${isSuccess ? "bg-[#4b8a66]" : "bg-[#c87969]"}`} />
+                              {statusProses}
                             </span>
-                            <strong className="text-[10px] font-semibold text-[#39463f]">{log.nama}</strong>
-                          </div>
-                        </td>
-                        <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">{log.aktivitas}</td>
-                        <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">{log.waktu}</td>
-                        <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">
-                          <span className={`inline-flex items-center gap-[6px] whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-medium ${log.status === "Sukses" ? "bg-[#edf5ef] text-[#397553]" : "bg-[#fbefed] text-[#a85749]"}`}>
-                            <span className={`h-[6px] w-[6px] rounded-full ${log.status === "Sukses" ? "bg-[#4b8a66]" : "bg-[#c87969]"}`} />
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="border-b border-[#edf0ed] px-4 py-[10px] text-[10px] text-[#748078]">
+                            <span className={`inline-flex items-center gap-[6px] whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-medium ${statusAbsensi === "Terlambat" ? "bg-[#fbefed] text-[#a85749]" : statusAbsensi === "Lebih Awal" ? "bg-[#edf5ef] text-[#397553]" : "bg-[#f3f5f3] text-[#748078]"}`}>
+                              {statusAbsensi}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
-            <footer className="border-t border-[#edf0ed] px-[21px] py-3">
-              <a href="/scanner" className="text-[10px] font-semibold text-[#397553] no-underline hover:underline">
-                Buka Halaman Absensi
-              </a>
-            </footer>
           </section>
         </div>
       </main>
