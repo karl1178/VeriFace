@@ -4,6 +4,9 @@ import AttendancePage from "./pages/AttendancePage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import ManageEmployeesPage from "./pages/ManageEmployeesPage.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import SignupPage from "./pages/SignupPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 import "./index.css";
 
 const routes = {
@@ -11,6 +14,9 @@ const routes = {
   "/scanner": AttendancePage,
   "/register": RegisterPage,
   "/manage": ManageEmployeesPage,
+  "/login": LoginPage,
+  "/signup": SignupPage,
+  "/settings": SettingsPage,
 };
 const path = window.location.pathname === "/" ? "/scanner" : window.location.pathname;
 

@@ -1,5 +1,5 @@
 import calendarIcon from "../assets/calendar.svg";
-import notificationIcon from "../assets/notifications.svg";
+import notificationIcon from "../assets/notification.svg";
 
 export default function WorkspaceTopBar({ title }) {
   const currentDate = new Intl.DateTimeFormat("id-ID", {
