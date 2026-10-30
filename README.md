@@ -23,6 +23,29 @@
    - Aktifkan venv: `venv\Scripts\activate` (Windows)
    - Install library: `pip install -r ai-service\requirements.txt`
 
+## Perubahan Registrasi Wajah 3 Sudut
+
+Registrasi baru meminta tiga foto berurutan: depan, sisi kiri, dan sisi kanan. Backend menyimpan ketiganya sebagai satu referensi wajah AES-256 dalam kolom `karyawan.feature`. Scanner membandingkan foto absensi dengan ketiga referensi dan memakai jarak terdekat. Data lama yang hanya berisi satu referensi tetap dikenali untuk kompatibilitas, tetapi karyawan lama sebaiknya didaftarkan ulang agar mendapatkan tiga sudut.
+
+Jika perlu menghapus dan membuat ulang seluruh schema PostgreSQL, jalankan perintah berikut dengan PostgreSQL aktif:
+
+```sql
+DROP DATABASE IF EXISTS absensi_db WITH (FORCE);
+CREATE DATABASE absensi_db;
+```
+
+Kemudian buat schema dari terminal proyek Windows:
+
+```powershell
+psql -U postgres -d absensi_db -f "backend\schema.sql"
+```
+
+Perintah ini menghapus semua karyawan, log absensi, dan pengaturan. Pastikan dilakukan hanya pada database uji atau setelah membuat backup. Untuk membackup dulu, jalankan:
+
+```powershell
+pg_dump -U postgres -d absensi_db -F c -f veriface-before-three-angle.backup
+```
+
 ## Cara Menjalankan
 
 Cukup double-click `mulai.bat` (khusus Windows). Script menunggu Server AI siap sebelum menyalakan backend dan frontend. Atau jalankan 3 server secara manual dari folder proyek, masing-masing di terminal terpisah:

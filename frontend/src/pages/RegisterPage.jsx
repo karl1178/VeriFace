@@ -10,6 +10,16 @@ export default function RegisterPage() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
   const [submitting, setSubmitting] = useState(false);
+  const [captureStep, setCaptureStep] = useState(0);
+  const [capturedImages, setCapturedImages] = useState([]);
+  const [validating, setValidating] = useState(false);
+  const [retryStep, setRetryStep] = useState(null);
+
+  const captureSteps = [
+    { label: "Wajah depan", instruction: "Lihat lurus ke kamera" },
+    { label: "Sisi kiri", instruction: "Putar wajah perlahan ke kiri" },
+    { label: "Sisi kanan", instruction: "Putar wajah perlahan ke kanan" },
+  ];
 
   useEffect(() => {
     let stream;
@@ -46,6 +56,37 @@ export default function RegisterPage() {
       setMessageType("error");
       return;
     }
+    if (capturedImages.filter(Boolean).length !== 3) {
+      setMessage("Ambil tiga foto: depan, sisi kiri, dan sisi kanan.");
+      setMessageType("error");
+      return;
+    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const formData = new FormData();
+    formData.append("nama", name.trim());
+    capturedImages.forEach((image, index) => {
+      formData.append("images", image, `face-${index + 1}.jpg`);
+    });
+    setSubmitting(true);
+    setMessage("");
+    try {
+      const data = await apiRequest("/api/register", { method: "POST", body: formData });
+      setMessage(data.pesan || "Wajah berhasil didaftarkan.");
+      setMessageType("success");
+      setName("");
+      setCaptureStep(0);
+      setCapturedImages([]);
+      setRetryStep(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Koneksi ke server gagal.");
+      setMessageType("error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function captureCurrentFace() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -62,22 +103,39 @@ export default function RegisterPage() {
       setMessageType("error");
       return;
     }
-    const formData = new FormData();
-    formData.append("image", image, "foto.jpg");
-    formData.append("nama", name.trim());
-    setSubmitting(true);
+
+    setValidating(true);
     setMessage("");
     try {
-      const data = await apiRequest("/api/register", { method: "POST", body: formData });
-      setMessage(data.pesan || "Wajah berhasil didaftarkan.");
-      setMessageType("success");
-      setName("");
+      const previewData = new FormData();
+      previewData.append("image", image, `face-${captureStep + 1}.jpg`);
+      previewData.append("angle", ["front", "left", "right"][captureStep]);
+      await apiRequest("/api/register/preview", { method: "POST", body: previewData });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Koneksi ke server gagal.");
+      setCapturedImages((current) => {
+        const next = [...current];
+        delete next[captureStep];
+        return next;
+      });
+      setRetryStep(captureStep);
+      setMessage(
+        `${captureSteps[captureStep].label} gagal terdeteksi. Posisikan wajah sesuai instruksi, lalu pilih Retry ${captureSteps[captureStep].label}.`,
+      );
       setMessageType("error");
+      return;
     } finally {
-      setSubmitting(false);
+      setValidating(false);
     }
+
+    setCapturedImages((current) => {
+      const next = [...current];
+      next[captureStep] = image;
+      return next;
+    });
+    setRetryStep(null);
+    setMessage(`${captureSteps[captureStep].label} berhasil diambil.`);
+    setMessageType("success");
+    if (captureStep < 2) setCaptureStep((step) => step + 1);
   }
 
   return (
@@ -91,17 +149,42 @@ export default function RegisterPage() {
             Kembali ke Dashboard
           </a>
           <h1 className="mt-4 mb-1 text-lg font-semibold tracking-[-0.035em]">Registrasi Wajah</h1>
-          <p className="m-0 text-xs text-[#89938c]">Posisikan wajah di depan kamera untuk mendaftarkan karyawan.</p>
+          <p className="m-0 text-xs text-[#89938c]">Ambil wajah depan, sisi kiri, lalu sisi kanan untuk mendaftarkan karyawan.</p>
         </div>
         <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full rounded-lg bg-[#202c26] object-cover -scale-x-100" aria-label="Pratinjau kamera" />
         <canvas ref={canvasRef} className="hidden" />
         {cameraError && <p className="mt-3 text-sm text-[#a85749]" role="alert">{cameraError}</p>}
+        <div className="mt-4 rounded-lg border border-[#e7ebe7] bg-[#f8faf8] px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            {captureSteps.map((step, index) => (
+              <div key={step.label} className="flex items-center gap-1.5">
+                <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold ${capturedImages[index] ? "bg-[#397553] text-white" : index === captureStep ? "bg-[#dcebe1] text-[#397553]" : "bg-[#edf0ed] text-[#89938c]"}`}>
+                  {capturedImages[index] ? "✓" : index + 1}
+                </span>
+                <span className="text-[10px] font-medium text-[#56645b]">{step.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 mb-0 text-xs font-semibold text-[#397553]">{captureSteps[captureStep]?.instruction}</p>
+        </div>
         <form onSubmit={registerFace}>
           <label className="mt-5 block text-sm font-medium text-[#344139]" htmlFor="nama">Nama karyawan</label>
           <input id="nama" type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Masukkan nama" autoComplete="name" required className="mt-2 w-full rounded-md border border-[#dfe5df] px-3 py-2.5 text-sm text-[#202c26] outline-none transition placeholder:text-[#a0a8a2] focus:border-[#397553] focus:ring-2 focus:ring-[#edf4ef]" />
-          <button type="submit" disabled={submitting || Boolean(cameraError) || !cameraReady} className="mt-4 w-full rounded-md bg-[#397553] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-wait disabled:opacity-60">
-            {submitting ? "Mendaftarkan..." : cameraReady ? "Register wajah" : "Menyiapkan kamera..."}
-          </button>
+          {capturedImages.filter(Boolean).length < 3 ? (
+            <button type="button" onClick={captureCurrentFace} disabled={submitting || validating || Boolean(cameraError) || !cameraReady} className="mt-4 w-full rounded-md bg-[#397553] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-wait disabled:opacity-60">
+              {!cameraReady
+                ? "Menyiapkan kamera..."
+                : validating
+                  ? `Memvalidasi ${captureSteps[captureStep].label}...`
+                  : retryStep === captureStep
+                    ? `Retry ${captureSteps[captureStep].label}`
+                    : `Ambil foto ${captureSteps[captureStep].label}`}
+            </button>
+          ) : (
+            <button type="submit" disabled={submitting || Boolean(cameraError) || !cameraReady} className="mt-4 w-full rounded-md bg-[#397553] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-wait disabled:opacity-60">
+              {submitting ? "Mendaftarkan..." : "Simpan 3 wajah karyawan"}
+            </button>
+          )}
         </form>
         {message && <p role="status" className={`mt-4 rounded-md px-3 py-2.5 text-sm ${messageType === "success" ? "bg-[#edf5ef] text-[#397553]" : "bg-[#fbefed] text-[#a85749]"}`}>{message}</p>}
       </section>
