@@ -52,6 +52,20 @@ function hitungJarak(vektor1, vektor2) {
   return Math.sqrt(sum);
 }
 
+function ambilFiturReferensi(parsedDb) {
+  if (Array.isArray(parsedDb)) return [parsedDb];
+  if (!parsedDb?.cipher) return [];
+
+  const decrypted = JSON.parse(decryptData(parsedDb.cipher));
+  if (Array.isArray(decrypted)) return [decrypted];
+  if (Array.isArray(decrypted?.references)) {
+    return decrypted.references
+      .filter((reference) => Array.isArray(reference.feature))
+      .map((reference) => reference.feature);
+  }
+  return [];
+}
+
 function handleBackendError(error, res) {
   if (error.code === "ECONNREFUSED" && error.config?.url?.startsWith("http://127.0.0.1:8000/")) {
     console.error("AI SERVICE ERROR: Layanan AI tidak aktif di http://127.0.0.1:8000");
@@ -166,40 +180,61 @@ app.delete("/api/employees/:id", async (req, res) => {
 });
 
 // REGISTER WAJAH (ENKRIPSI SEBELUM DISIMPAN)
-app.post("/api/register", upload.single("image"), async (req, res) => {
+app.post("/api/register/preview", upload.single("image"), async (req, res) => {
   try {
-    const nama = typeof req.body?.nama === "string" ? req.body.nama.trim() : "";
-    if (!req.file || !nama) return res.status(400).json({ error: "Gambar dan nama wajib diisi" });
+    const angle = typeof req.body?.angle === "string" ? req.body.angle.trim() : "";
+    const allowedAngles = ["front", "left", "right"];
+    if (!req.file || !allowedAngles.includes(angle)) {
+      return res.status(400).json({ error: "Sudut wajah tidak valid atau gambar tidak tersedia" });
+    }
 
     const form = new FormData();
-    form.append("image", req.file.buffer, { filename: "reg.jpg", contentType: "image/jpeg" });
-
+    form.append("image", req.file.buffer, { filename: `${angle}.jpg`, contentType: "image/jpeg" });
     const fastApiResponse = await axios.post("http://127.0.0.1:8000/extract-feature", form, { headers: form.getHeaders() });
     const dataAI = fastApiResponse.data;
 
-    if (dataAI.status === "success") {
-      // 1. Ubah array 128 angka menjadi string
-      const featureString = JSON.stringify(dataAI.feature);
-
-      // 2. Enkripsi string tersebut menggunakan AES-256
-      const cipherText = encryptData(featureString);
-
-      // 3. Bungkus jadi JSON (karena kolom database kita tipe datanya JSON)
-      const secureData = JSON.stringify({ cipher: cipherText });
-
-      const employeeResult = await pool.query(
-        "INSERT INTO karyawan (nama, feature) VALUES ($1, $2) RETURNING id",
-        [nama, secureData],
-      );
-      await pool.query(
-        "INSERT INTO log_absen (karyawan_id, aktivitas, status_proses) VALUES ($1, $2, $3)",
-        [employeeResult.rows[0].id, "Register", "Sukses"],
-      );
-
-      res.json({ pesan: `Wajah ${nama} berhasil disimpan dengan Enkripsi AES-256!` });
-    } else {
-      res.status(400).json({ error: dataAI.message });
+    if (dataAI.status !== "success") {
+      return res.status(400).json({ error: `${angle}: ${dataAI.message || "Wajah tidak ditemukan"}` });
     }
+
+    res.json({ pesan: `Wajah ${angle} berhasil dideteksi.`, detected: true });
+  } catch (error) {
+    handleBackendError(error, res);
+  }
+});
+
+app.post("/api/register", upload.array("images", 3), async (req, res) => {
+  try {
+    const nama = typeof req.body?.nama === "string" ? req.body.nama.trim() : "";
+    if (!Array.isArray(req.files) || req.files.length !== 3 || !nama) {
+      return res.status(400).json({ error: "Nama dan tepat 3 gambar wajah wajib diisi" });
+    }
+
+    const angles = ["front", "left", "right"];
+    const references = [];
+    for (let index = 0; index < req.files.length; index++) {
+      const form = new FormData();
+      form.append("image", req.files[index].buffer, { filename: `${angles[index]}.jpg`, contentType: "image/jpeg" });
+      const fastApiResponse = await axios.post("http://127.0.0.1:8000/extract-feature", form, { headers: form.getHeaders() });
+      if (fastApiResponse.data.status !== "success") {
+        return res.status(400).json({ error: `${angles[index]}: ${fastApiResponse.data.message || "Wajah tidak ditemukan"}` });
+      }
+      references.push({ angle: angles[index], feature: fastApiResponse.data.feature });
+    }
+
+    const cipherText = encryptData(JSON.stringify({ references }));
+    const secureData = JSON.stringify({ version: 2, cipher: cipherText });
+
+    const employeeResult = await pool.query(
+      "INSERT INTO karyawan (nama, feature) VALUES ($1, $2) RETURNING id",
+      [nama, secureData],
+    );
+    await pool.query(
+      "INSERT INTO log_absen (karyawan_id, aktivitas, status_proses) VALUES ($1, $2, $3)",
+      [employeeResult.rows[0].id, "Register", "Sukses"],
+    );
+
+    res.json({ pesan: `3 referensi wajah ${nama} berhasil disimpan dengan Enkripsi AES-256!` });
   } catch (error) {
     handleBackendError(error, res);
   }
@@ -228,13 +263,11 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
         try {
           // 1. Ekstrak data JSON dari database
           const parsedDb = typeof karyawan.feature === "string" ? JSON.parse(karyawan.feature) : karyawan.feature;
+          const fiturReferensi = ambilFiturReferensi(parsedDb);
 
-          // 2. Jika data terenkripsi, lakukan dekripsi
-          if (parsedDb.cipher) {
-            const decryptedString = decryptData(parsedDb.cipher);
-            const featureDb = JSON.parse(decryptedString);
-
-            // 3. Hitung kecocokan seperti biasa
+          // Bandingkan dengan setiap sudut, lalu gunakan jarak terdekat untuk mengenali wajah.
+          for (const featureDb of fiturReferensi) {
+            if (featureDb.length !== vektorAbsen.length) continue;
             const jarak = hitungJarak(vektorAbsen, featureDb);
             if (jarak < 0.6 && jarak < jarakTerkecil) {
               jarakTerkecil = jarak;
