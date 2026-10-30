@@ -5,6 +5,8 @@ const FormData = require("form-data");
 const cors = require("cors");
 const { Pool } = require("pg");
 const crypto = require("crypto"); // Modul Kriptografi bawaan Node.js
+const bcrypt = require("bcryptjs");
+const session = require("express-session");
 
 // --- KONFIGURASI KRIPTOGRAFI AES-256-CBC ---
 const ALGORITHM = "aes-256-cbc";
@@ -42,9 +44,119 @@ const pool = new Pool({
 });
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
 app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || "veriface-development-session-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, sameSite: "lax", secure: false, maxAge: 24 * 60 * 60 * 1000 },
+}));
 const upload = multer({ storage: multer.memoryStorage() });
+
+function requireAuth(req, res, next) {
+  if (!req.session.adminId || !req.session.workspaceId) {
+    return res.status(401).json({ error: "Silakan masuk terlebih dahulu." });
+  }
+  next();
+}
+
+app.post("/api/auth/signup", async (req, res) => {
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!name || !email || password.length < 8) {
+    return res.status(400).json({ error: "Nama, email, dan kata sandi minimal 8 karakter wajib diisi." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const workspaceResult = await client.query(
+      "INSERT INTO workspace (nama) VALUES ($1) RETURNING id",
+      [`Ruang Kerja ${name}`],
+    );
+    const workspaceId = workspaceResult.rows[0].id;
+    const passwordHash = await bcrypt.hash(password, 12);
+    const adminResult = await client.query(
+      "INSERT INTO admin (workspace_id, nama, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id",
+      [workspaceId, name, email, passwordHash],
+    );
+    await client.query(
+      "INSERT INTO pengaturan_absensi (workspace_id) VALUES ($1) ON CONFLICT (workspace_id) DO NOTHING",
+      [workspaceId],
+    );
+    await client.query("COMMIT");
+
+    req.session.adminId = adminResult.rows[0].id;
+    req.session.workspaceId = workspaceId;
+    res.status(201).json({ admin: { name, email }, workspaceId });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error.code === "23505") {
+      return res.status(409).json({ error: "Email sudah terdaftar. Silakan masuk." });
+    }
+    console.error("SIGNUP ERROR:", error);
+    return res.status(500).json({ error: "Gagal membuat akun." });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!email || !password) return res.status(400).json({ error: "Email dan kata sandi wajib diisi." });
+
+  try {
+    const result = await pool.query(
+      "SELECT id, workspace_id, nama, email, password_hash FROM admin WHERE email = $1",
+      [email],
+    );
+    const admin = result.rows[0];
+    if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
+      return res.status(401).json({ error: "Email atau kata sandi salah." });
+    }
+    req.session.adminId = admin.id;
+    req.session.workspaceId = admin.workspace_id;
+    res.json({ admin: { id: admin.id, name: admin.nama, email: admin.email }, workspaceId: admin.workspace_id });
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    res.status(500).json({ error: "Gagal masuk." });
+  }
+});
+
+app.get("/api/auth/me", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    "SELECT admin.id, admin.nama, admin.email, admin.workspace_id, workspace.nama AS workspace_name FROM admin JOIN workspace ON workspace.id = admin.workspace_id WHERE admin.id = $1 AND admin.workspace_id = $2",
+    [req.session.adminId, req.session.workspaceId],
+  );
+  if (!result.rowCount) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: "Sesi tidak valid." });
+  }
+  const admin = result.rows[0];
+  res.json({
+    admin: { id: admin.id, name: admin.nama, email: admin.email },
+    workspace: { id: admin.workspace_id, name: admin.workspace_name },
+  });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  req.session.destroy((error) => {
+    res.clearCookie("connect.sid", { httpOnly: true, sameSite: "lax", secure: false });
+    if (error) {
+      console.error("LOGOUT ERROR:", error);
+      return res.status(500).json({ error: "Gagal keluar." });
+    }
+    res.json({ pesan: "Berhasil keluar." });
+  });
+});
+
+app.use("/api", requireAuth);
 
 function hitungJarak(vektor1, vektor2) {
   let sum = 0;
@@ -87,11 +199,12 @@ app.get("/api/logs", async (req, res) => {
         log.status_proses,
         log.status_kehadiran
       FROM log_absen AS log
-      LEFT JOIN karyawan ON karyawan.id = log.karyawan_id
+      LEFT JOIN karyawan ON karyawan.id = log.karyawan_id AND karyawan.workspace_id = $1
       CROSS JOIN pengaturan_absensi
-      WHERE pengaturan_absensi.id = 1
+      WHERE pengaturan_absensi.workspace_id = $1
+        AND log.workspace_id = $1
       ORDER BY log.waktu DESC, log.id DESC
-    `);
+    `, [req.session.workspaceId]);
     res.json(result.rows);
   } catch (err) {
     console.error("DATABASE ERROR:", err.message); // <-- Add this line!
@@ -104,8 +217,8 @@ app.get("/api/settings/attendance", async (req, res) => {
     const result = await pool.query(`
       SELECT TO_CHAR(jam_masuk, 'HH24:MI') AS jam_masuk, zona_waktu
       FROM pengaturan_absensi
-      WHERE id = 1
-    `);
+      WHERE workspace_id = $1
+    `, [req.session.workspaceId]);
     if (!result.rowCount) throw new Error("Pengaturan absensi belum tersedia di database");
     res.json(result.rows[0]);
   } catch (err) {
@@ -123,9 +236,9 @@ app.patch("/api/settings/attendance", async (req, res) => {
     const result = await pool.query(`
       UPDATE pengaturan_absensi
       SET jam_masuk = $1::time
-      WHERE id = 1
+      WHERE workspace_id = $2
       RETURNING TO_CHAR(jam_masuk, 'HH24:MI') AS jam_masuk, zona_waktu
-    `, [jamMasuk]);
+    `, [jamMasuk, req.session.workspaceId]);
     if (!result.rowCount) throw new Error("Pengaturan absensi belum tersedia di database");
     res.json(result.rows[0]);
   } catch (err) {
@@ -137,7 +250,10 @@ app.patch("/api/settings/attendance", async (req, res) => {
 // MANAJEMEN KARYAWAN
 app.get("/api/employees", async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, nama FROM karyawan WHERE archived_at IS NULL ORDER BY nama ASC, id ASC");
+    const result = await pool.query(
+      "SELECT id, nama FROM karyawan WHERE workspace_id = $1 AND archived_at IS NULL ORDER BY nama ASC, id ASC",
+      [req.session.workspaceId],
+    );
     res.json(result.rows);
   } catch (err) {
     console.error("DATABASE ERROR:", err.message);
@@ -152,8 +268,8 @@ app.patch("/api/employees/:id", async (req, res) => {
   if (!nama) return res.status(400).json({ error: "Nama karyawan wajib diisi" });
   try {
     const result = await pool.query(
-      "UPDATE karyawan SET nama = $1, updated_at = NOW() WHERE id = $2 AND archived_at IS NULL RETURNING id, nama",
-      [nama, id],
+      "UPDATE karyawan SET nama = $1, updated_at = NOW() WHERE id = $2 AND workspace_id = $3 AND archived_at IS NULL RETURNING id, nama",
+      [nama, id, req.session.workspaceId],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Karyawan tidak ditemukan" });
     res.json(result.rows[0]);
@@ -168,8 +284,8 @@ app.delete("/api/employees/:id", async (req, res) => {
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "ID karyawan tidak valid" });
   try {
     const result = await pool.query(
-      "UPDATE karyawan SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND archived_at IS NULL RETURNING id",
-      [id],
+      "UPDATE karyawan SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND workspace_id = $2 AND archived_at IS NULL RETURNING id",
+      [id, req.session.workspaceId],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Karyawan tidak ditemukan" });
     res.json({ pesan: "Data karyawan berhasil diarsipkan" });
@@ -226,12 +342,12 @@ app.post("/api/register", upload.array("images", 3), async (req, res) => {
     const secureData = JSON.stringify({ version: 2, cipher: cipherText });
 
     const employeeResult = await pool.query(
-      "INSERT INTO karyawan (nama, feature) VALUES ($1, $2) RETURNING id",
-      [nama, secureData],
+      "INSERT INTO karyawan (workspace_id, nama, feature) VALUES ($1, $2, $3) RETURNING id",
+      [req.session.workspaceId, nama, secureData],
     );
     await pool.query(
-      "INSERT INTO log_absen (karyawan_id, aktivitas, status_proses) VALUES ($1, $2, $3)",
-      [employeeResult.rows[0].id, "Register", "Sukses"],
+      "INSERT INTO log_absen (workspace_id, karyawan_id, aktivitas, status_proses) VALUES ($1, $2, $3, $4)",
+      [req.session.workspaceId, employeeResult.rows[0].id, "Register", "Sukses"],
     );
 
     res.json({ pesan: `3 referensi wajah ${nama} berhasil disimpan dengan Enkripsi AES-256!` });
@@ -253,7 +369,10 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
 
     if (dataAI.status === "success") {
       const vektorAbsen = dataAI.feature;
-      const dbResult = await pool.query("SELECT id, nama, feature FROM karyawan WHERE archived_at IS NULL");
+      const dbResult = await pool.query(
+        "SELECT id, nama, feature FROM karyawan WHERE workspace_id = $1 AND archived_at IS NULL",
+        [req.session.workspaceId],
+      );
       const databaseKaryawan = dbResult.rows;
 
       let karyawanDikenali = null;
@@ -285,20 +404,24 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
         try {
           await client.query("BEGIN");
           transactionStarted = true;
-          await client.query("SELECT id FROM karyawan WHERE id = $1 FOR UPDATE", [karyawanDikenali.id]);
+          await client.query(
+            "SELECT id FROM karyawan WHERE id = $1 AND workspace_id = $2 FOR UPDATE",
+            [karyawanDikenali.id, req.session.workspaceId],
+          );
 
           const existingAttendance = await client.query(
             `SELECT 1
              FROM log_absen AS log
              CROSS JOIN pengaturan_absensi
              WHERE log.karyawan_id = $1
+               AND log.workspace_id = $2
                AND log.aktivitas = 'Absen Masuk'
                AND log.status_proses = 'Sukses'
-               AND pengaturan_absensi.id = 1
+               AND pengaturan_absensi.workspace_id = $2
                AND (log.waktu AT TIME ZONE pengaturan_absensi.zona_waktu)::date =
                    (NOW() AT TIME ZONE pengaturan_absensi.zona_waktu)::date
              LIMIT 1`,
-            [karyawanDikenali.id],
+            [karyawanDikenali.id, req.session.workspaceId],
           );
 
           if (existingAttendance.rowCount) {
@@ -308,16 +431,16 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
           }
 
           const attendanceResult = await client.query(
-            `INSERT INTO log_absen (karyawan_id, aktivitas, status_proses, status_kehadiran)
-             SELECT $1, $2, 'Sukses',
+            `INSERT INTO log_absen (workspace_id, karyawan_id, aktivitas, status_proses, status_kehadiran)
+             SELECT $1, $2, $3, 'Sukses',
                CASE
                  WHEN (NOW() AT TIME ZONE pengaturan_absensi.zona_waktu)::time < pengaturan_absensi.jam_masuk
                    THEN 'awal'
                  ELSE 'terlambat'
                END
              FROM pengaturan_absensi
-             WHERE pengaturan_absensi.id = 1`,
-            [karyawanDikenali.id, "Absen Masuk"],
+             WHERE pengaturan_absensi.workspace_id = $1`,
+            [req.session.workspaceId, karyawanDikenali.id, "Absen Masuk"],
           );
           if (!attendanceResult.rowCount) throw new Error("Pengaturan waktu absensi belum tersedia di database");
 
@@ -332,8 +455,8 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
         res.json({ pesan: `Absen berhasil! Selamat bekerja, ${karyawanDikenali.nama}.` });
       } else {
         await pool.query(
-          "INSERT INTO log_absen (karyawan_id, aktivitas, status_proses) VALUES (NULL, $1, $2)",
-          ["Absen Masuk", "Gagal"],
+          "INSERT INTO log_absen (workspace_id, karyawan_id, aktivitas, status_proses) VALUES ($1, NULL, $2, $3)",
+          [req.session.workspaceId, "Absen Masuk", "Gagal"],
         );
         res.status(401).json({ error: "Wajah tidak dikenali." });
       }

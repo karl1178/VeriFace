@@ -1,7 +1,30 @@
 import { useState } from "react";
+import { apiRequest } from "../api.js";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submitLogin(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await apiRequest("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      window.location.href = "/dashboard";
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Gagal masuk.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#edf3ef] px-4 py-5 text-[#202c26] sm:px-8 sm:py-8">
@@ -51,7 +74,7 @@ export default function LoginPage() {
               </h1>
             </div>
 
-            <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-5" onSubmit={submitLogin}>
               <div>
                 <label className="mb-2 block text-[12px] font-semibold text-[#344139]" htmlFor="email">
                   Email
@@ -60,6 +83,9 @@ export default function LoginPage() {
                   id="email"
                   name="email"
                   type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   autoComplete="email"
                   placeholder="admin@veriface.com"
                   className="h-[48px] w-full rounded-lg border border-[#dfe6e0] bg-white px-4 text-[13px] text-[#202c26] outline-none transition placeholder:text-[#aab2ac] focus:border-[#397553] focus:ring-4 focus:ring-[#edf4ef]"
@@ -80,6 +106,9 @@ export default function LoginPage() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
                     autoComplete="current-password"
                     placeholder="Masukkan kata sandi"
                     className="h-[48px] w-full rounded-lg border border-[#dfe6e0] bg-white px-4 pr-12 text-[13px] text-[#202c26] outline-none transition placeholder:text-[#aab2ac] focus:border-[#397553] focus:ring-4 focus:ring-[#edf4ef]"
@@ -106,10 +135,12 @@ export default function LoginPage() {
 
               <button
                 type="submit"
+                disabled={loading}
                 className="h-[48px] w-full rounded-lg border-0 bg-[#397553] text-[13px] font-semibold text-white transition hover:bg-[#28634c] active:bg-[#245840]"
               >
-                Masuk
+                {loading ? "Memproses..." : "Masuk"}
               </button>
+              {error && <p role="alert" className="text-center text-[12px] text-[#b5473a]">{error}</p>}
             </form>
 
             <p className="mt-6 mb-0 text-center text-[12px] text-[#89938c]">

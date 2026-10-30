@@ -1,10 +1,22 @@
 import { useState } from "react";
 import WorkspaceSidebar from "../components/WorkspaceSidebar.jsx";
 import WorkspaceTopBar from "../components/WorkspaceTopBar.jsx";
+import { apiRequest } from "../api.js";
 
 export default function SettingsPage() {
   const [twoStepEnabled, setTwoStepEnabled] = useState(true);
   const [supportAccessEnabled, setSupportAccessEnabled] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  async function logout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await apiRequest("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.replace("/login");
+    }
+  }
 
   function Toggle({ checked, onChange, label }) {
     return (
@@ -87,8 +99,8 @@ export default function SettingsPage() {
                   <h3 className="m-0 text-[11px] font-semibold text-[#344139]">Log out</h3>
                   <p className="mt-[4px] mb-0 text-[9px] leading-[1.4] text-[#89938c]">Log out of VeriFace on this device.</p>
                 </div>
-                <button type="button" className="h-[34px] shrink-0 rounded-md bg-[#397553] px-[13px] text-[10px] font-semibold text-white transition hover:bg-[#28634c]">
-                  Log out
+                <button type="button" onClick={logout} disabled={isLoggingOut} className="h-[34px] shrink-0 rounded-md bg-[#397553] px-[13px] text-[10px] font-semibold text-white transition hover:bg-[#28634c] disabled:cursor-not-allowed disabled:opacity-70">
+                  {isLoggingOut ? "Logging out..." : "Log out"}
                 </button>
               </div>
 

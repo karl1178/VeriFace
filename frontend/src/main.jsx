@@ -7,6 +7,7 @@ import ManageEmployeesPage from "./pages/ManageEmployeesPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import { apiRequest } from "./api.js";
 import "./index.css";
 
 const routes = {
@@ -24,10 +25,34 @@ if (path !== window.location.pathname) {
   window.history.replaceState(null, "", path);
 }
 
-const Page = routes[path] ?? AttendancePage;
+async function bootstrap() {
+  const authOnlyPaths = new Set(["/login", "/signup"]);
 
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <Page />
-  </React.StrictMode>,
-);
+  if (authOnlyPaths.has(path)) {
+    try {
+      await apiRequest("/api/auth/me");
+      if (path === "/login" || path === "/signup") {
+        window.location.replace("/dashboard");
+        return;
+      }
+    } catch {
+      // Authentication pages remain accessible.
+    }
+  } else {
+    try {
+      await apiRequest("/api/auth/me");
+    } catch {
+      window.location.replace("/login");
+      return;
+    }
+  }
+
+  const Page = routes[path] ?? AttendancePage;
+  createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <Page />
+    </React.StrictMode>,
+  );
+}
+
+bootstrap();

@@ -1,8 +1,41 @@
 import { useState } from "react";
+import { apiRequest } from "../api.js";
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submitSignup(event) {
+    event.preventDefault();
+    if (password !== confirmPassword) {
+      setError("Konfirmasi kata sandi tidak cocok.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Kata sandi minimal 8 karakter.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await apiRequest("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      window.location.href = "/dashboard";
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Gagal membuat akun.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function PasswordIcon({ visible }) {
     return visible ? (
@@ -51,7 +84,7 @@ export default function SignupPage() {
               </h1>
             </div>
 
-            <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-4" onSubmit={submitSignup}>
               <div>
                 <label className="mb-2 block text-[12px] font-semibold text-[#344139]" htmlFor="name">
                   Nama
@@ -60,6 +93,9 @@ export default function SignupPage() {
                   id="name"
                   name="name"
                   type="text"
+                  required
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
                   autoComplete="name"
                   placeholder="Masukkan nama"
                   className="h-[48px] w-full rounded-lg border border-[#dfe6e0] bg-white px-4 text-[13px] text-[#202c26] outline-none transition placeholder:text-[#aab2ac] focus:border-[#397553] focus:ring-4 focus:ring-[#edf4ef]"
@@ -74,6 +110,9 @@ export default function SignupPage() {
                   id="email"
                   name="email"
                   type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   autoComplete="email"
                   placeholder="admin@veriface.com"
                   className="h-[48px] w-full rounded-lg border border-[#dfe6e0] bg-white px-4 text-[13px] text-[#202c26] outline-none transition placeholder:text-[#aab2ac] focus:border-[#397553] focus:ring-4 focus:ring-[#edf4ef]"
@@ -89,6 +128,9 @@ export default function SignupPage() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
                     autoComplete="new-password"
                     placeholder="Masukkan kata sandi"
                     className="h-[48px] w-full rounded-lg border border-[#dfe6e0] bg-white px-4 pr-12 text-[13px] text-[#202c26] outline-none transition placeholder:text-[#aab2ac] focus:border-[#397553] focus:ring-4 focus:ring-[#edf4ef]"
@@ -113,6 +155,9 @@ export default function SignupPage() {
                     id="confirm-password"
                     name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
+                    required
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
                     autoComplete="new-password"
                     placeholder="Ulangi kata sandi"
                     className="h-[48px] w-full rounded-lg border border-[#dfe6e0] bg-white px-4 pr-12 text-[13px] text-[#202c26] outline-none transition placeholder:text-[#aab2ac] focus:border-[#397553] focus:ring-4 focus:ring-[#edf4ef]"
@@ -130,10 +175,12 @@ export default function SignupPage() {
 
               <button
                 type="submit"
+                disabled={loading}
                 className="h-[48px] w-full rounded-lg border-0 bg-[#397553] text-[13px] font-semibold text-white transition hover:bg-[#28634c] active:bg-[#245840]"
               >
-                Daftar
+                {loading ? "Memproses..." : "Daftar"}
               </button>
+              {error && <p role="alert" className="text-center text-[12px] text-[#b5473a]">{error}</p>}
             </form>
 
             <p className="mt-6 mb-0 text-center text-[12px] text-[#89938c]">
