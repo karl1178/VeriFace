@@ -15,7 +15,6 @@
   --color-danger: #a85749;
   --color-danger-surface: #fbefed;
   --color-danger-border: #e8c9c4;
-  --color-notification: #d64545;
   --color-ink: #202c26;
   --color-ink-secondary: #344139;
   --color-text-muted: #748078;
@@ -40,6 +39,7 @@
 }
 
 body {
+  zoom: 1.25;
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
