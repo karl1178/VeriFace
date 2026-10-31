@@ -5,9 +5,35 @@
 @import "tailwindcss";
 
 :root {
+  --color-brand: #397553;
+  --color-brand-hover: #28634c;
+  --color-brand-on-dark: #d5e3da;
+  --color-brand-wash: #edf4ef;
+  --color-brand-soft: #dcebe1;
+  --color-brand-border: #dce9df;
+  --color-success-border: #cce2d2;
+  --color-danger: #a85749;
+  --color-danger-surface: #fbefed;
+  --color-danger-border: #e8c9c4;
+  --color-notification: #d64545;
+  --color-ink: #202c26;
+  --color-ink-secondary: #344139;
+  --color-text-muted: #748078;
+  --color-text-soft: #89938c;
+  --color-text-placeholder: #a0a8a2;
+  --color-border: #e7ebe7;
+  --color-border-subtle: #edf0ed;
+  --color-border-input: #dfe4e0;
+  --color-page: #f5f7f5;
+  --color-surface-muted: #f8faf8;
+  --color-surface-danger: #fffafa;
+  --color-auth-page: #edf3ef;
+  --color-root-ink: #172033;
+  --color-root-page: #f3f6fb;
+
   font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  color: #172033;
-  background: #f3f6fb;
+  color: var(--color-root-ink);
+  background: var(--color-root-page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -22,6 +48,16 @@ body {
 button,
 input {
   font-family: inherit;
+}
+
+a,
+button:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
 }
 
 .scanner-toast {

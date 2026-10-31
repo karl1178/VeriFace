@@ -122,35 +122,35 @@ export default function AttendancePage() {
   }, [cameraReady]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f5f7f5] px-4 py-8 text-[#202c26]">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--color-page)] px-4 py-8 text-[var(--color-ink)]">
       {notification && (
         <div key={notification.id} className="scanner-toast fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4" aria-live="polite">
-          <div role="status" className="flex w-full max-w-lg items-center gap-3 rounded-lg border border-[#cce2d2] bg-white px-4 py-3 shadow-lg">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#397553] text-sm font-bold text-white" aria-hidden="true">✓</span>
-            <span className="text-sm font-medium text-[#28634c]">{notification.message}</span>
+          <div role="status" className="flex w-full max-w-lg items-center gap-3 rounded-lg border border-[var(--color-success-border)] bg-white px-4 py-3 shadow-lg">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white" aria-hidden="true">Ã¢Å“â€œ</span>
+            <span className="text-sm font-medium text-[var(--color-brand-hover)]">{notification.message}</span>
           </div>
         </div>
       )}
 
-      <section className="w-full max-w-lg rounded-xl border border-[#e7ebe7] bg-white p-5 shadow-sm sm:p-7">
+      <section className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm sm:p-7">
         <div className="mb-5">
-          <a href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-[#748078] no-underline hover:text-[#397553]">
+          <a href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-muted)] no-underline hover:text-[var(--color-brand)]">
             <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="M12.5 4.5 7 10l5.5 5.5M7.5 10h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Kembali ke Dashboard
           </a>
           <h1 className="mt-4 mb-1 text-lg font-semibold tracking-[-0.035em]">Scanner Kehadiran</h1>
-          <p className="m-0 text-xs text-[#89938c]">Posisikan wajah di depan kamera untuk scan wajah.</p>
+          <p className="m-0 text-xs text-[var(--color-text-soft)]">Posisikan wajah di depan kamera untuk scan wajah.</p>
         </div>
-        <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full rounded-lg bg-[#202c26] object-cover -scale-x-100" aria-label="Pratinjau kamera absensi" />
+        <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full rounded-lg bg-[var(--color-ink)] object-cover -scale-x-100" aria-label="Pratinjau kamera absensi" />
         <canvas ref={canvasRef} className="hidden" />
-        {cameraError && <p className="mt-3 text-sm text-[#a85749]" role="alert">{cameraError}</p>}
-        {scanError && <p className="mt-3 text-sm text-[#a85749]" role="alert">{scanError}</p>}
+        {cameraError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{cameraError}</p>}
+        {scanError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{scanError}</p>}
         {countdown !== null ? (
-          <p className="mt-4 mb-0 text-center text-sm font-medium text-[#748078]" aria-live="polite">Try again in {countdown}</p>
+          <p className="mt-4 mb-0 text-center text-sm font-medium text-[var(--color-text-muted)]" aria-live="polite">Try again in {countdown}</p>
         ) : (
-          <p className="mt-4 mb-0 text-center text-xs text-[#89938c]" aria-live="polite">{cameraReady ? "Menunggu wajah..." : "Menyiapkan kamera..."}</p>
+          <p className="mt-4 mb-0 text-center text-xs text-[var(--color-text-soft)]" aria-live="polite">{cameraReady ? "Menunggu wajah..." : "Menyiapkan kamera..."}</p>
         )}
       </section>
     </main>
