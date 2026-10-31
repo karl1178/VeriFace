@@ -1,62 +1,72 @@
-# Sistem Absensi Wajah AI
+# Veriface
 
-## Struktur Proyek
+Aplikasi absensi dengan pengenalan wajah. Aplikasi terdiri dari:
 
-- `ai-service/`: layanan ekstraksi fitur wajah (FastAPI).
-- `backend/`: API Express, migrasi database, dan dependensi Node.js.
-- `frontend/`: aplikasi React dan Tailwind CSS untuk absensi dan dashboard.
-- `mulai.bat`: menjalankan ketiga layanan di Windows.
+- `ai-service`: layanan pengenalan wajah (FastAPI).
+- `backend`: API dan database (Node.js/Express).
+- `frontend`: tampilan web (React/Vite).
 
-## Persyaratan Sistem
+## Persyaratan
 
-1. Install **Node.js** (v18+)
-2. Install **Python** (v3.10+)
-3. Install **PostgreSQL** (v15+)
+- Windows
+- Node.js 18 atau lebih baru
+- Python 3.10 atau lebih baru
+- PostgreSQL 15 atau lebih baru
 
-## Cara Instalasi (Lakukan Sekali Saja)
+## Instalasi pertama kali
 
-1. **Database:** Buat database bernama `absensi_db`, lalu dari folder proyek jalankan `psql -U postgres -d absensi_db -f backend/schema.sql`. Schema ini membuat tabel `karyawan`, `log_absen`, dan `pengaturan_absensi`; setiap log menyimpan `karyawan_id`, bukan salinan nama. Nama pada riwayat ditampilkan dari data karyawan saat ini. Status waktu absensi (`status_kehadiran`: `awal` atau `terlambat`) disimpan saat scan sehingga perubahan batas jam masuk tidak mengubah log lama. Batas awalnya 07:00 pada zona waktu Asia/Jakarta dan dapat diubah dari Kelola Karyawan. Penghapusan karyawan melalui aplikasi mengarsipkannya agar riwayat absensi tetap terhubung.
-2. **Setup Backend (Node.js):** Dari folder proyek, jalankan `npm --prefix backend install`. Sesuaikan konfigurasi PostgreSQL di `backend/server.js`.
-   Untuk database lama, jalankan `npm --prefix backend run migrate` sebelum memulai server. Migrasi ini memindahkan data lama ke satu ruang kerja dan menyiapkan tabel admin/workspace.
-3. **Setup Frontend (React + Tailwind CSS):** Dari folder proyek, jalankan `npm --prefix frontend install`.
-4. **Setup AI (Python):**
-   - Dari folder proyek, buat environment baru: `python -m venv venv`
-   - Aktifkan venv: `venv\Scripts\activate` (Windows)
-   - Install library: `pip install -r ai-service\requirements.txt`
+Jalankan perintah berikut dari folder proyek:
 
-## Perubahan Registrasi Wajah 3 Sudut
-
-Registrasi baru meminta tiga foto berurutan: depan, sisi kiri, dan sisi kanan. Backend menyimpan ketiganya sebagai satu referensi wajah AES-256 dalam kolom `karyawan.feature`. Scanner membandingkan foto absensi dengan ketiga referensi dan memakai jarak terdekat. Data lama yang hanya berisi satu referensi tetap dikenali untuk kompatibilitas, tetapi karyawan lama sebaiknya didaftarkan ulang agar mendapatkan tiga sudut.
-
-Jika perlu menghapus dan membuat ulang seluruh schema PostgreSQL, jalankan perintah berikut dengan PostgreSQL aktif:
-
-```sql
-DROP DATABASE IF EXISTS absensi_db WITH (FORCE);
-CREATE DATABASE absensi_db;
+```powershell
+npm --prefix backend install
+npm --prefix frontend install
+python -m venv venv
+venv\Scripts\python.exe -m pip install -r ai-service\requirements.txt
 ```
 
-Kemudian buat schema dari terminal proyek Windows:
+Buat database PostgreSQL bernama `absensi_db`, lalu jalankan schema:
 
 ```powershell
 psql -U postgres -d absensi_db -f "backend\schema.sql"
 ```
 
-Perintah ini menghapus semua karyawan, log absensi, dan pengaturan. Pastikan dilakukan hanya pada database uji atau setelah membuat backup. Untuk membackup dulu, jalankan:
+Secara default, backend menggunakan PostgreSQL di `localhost:5432` dengan:
+
+- user: `postgres`
+- password: `root`
+- database: `absensi_db`
+
+Jika konfigurasi berbeda, atur environment variable `PGUSER`, `PGPASSWORD`,
+`PGHOST`, `PGPORT`, atau `PGDATABASE` sebelum menjalankan aplikasi.
+
+## Menjalankan aplikasi
+
+Cara termudah di Windows: **double-click `mulai.bat`** dari folder proyek.
+
+Script tersebut menjalankan semua layanan dan membuka:
+
+- Absensi: <http://localhost:5173/scanner>
+- Dashboard: <http://localhost:5173/dashboard>
+
+Jika ingin menjalankan secara manual, buka tiga terminal dari folder proyek:
 
 ```powershell
-pg_dump -U postgres -d absensi_db -F c -f veriface-before-three-angle.backup
+# Terminal 1 - AI service
+venv\Scripts\python.exe -m uvicorn main:app --app-dir ai-service
+
+# Terminal 2 - Backend
+npm --prefix backend start
+
+# Terminal 3 - Frontend
+npm --prefix frontend run dev
 ```
 
-## Cara Menjalankan
+Jalankan layanan AI terlebih dahulu dan biarkan ketiga terminal tetap terbuka.
 
-Cukup double-click `mulai.bat` (khusus Windows). Script menunggu Server AI siap sebelum menyalakan backend dan frontend. Atau jalankan 3 server secara manual dari folder proyek, masing-masing di terminal terpisah:
+## Build frontend
 
-1. `venv\Scripts\python -m uvicorn main:app --app-dir ai-service` (Server AI). Tunggu sampai server berjalan di `http://127.0.0.1:8000`.
-2. `npm --prefix backend start` (Server Backend).
-3. `npm --prefix frontend run dev` (Server Web).
+```powershell
+npm --prefix frontend run build
+```
 
-Biarkan ketiga terminal tetap berjalan. Jika backend menampilkan bahwa layanan AI tidak aktif, pastikan Server AI sudah berjalan di port 8000 sebelum mengulangi permintaan.
-
-Buka `http://localhost:5173/scanner` untuk web absensi dan `http://localhost:5173/dashboard` untuk dashboard. Alamat `http://localhost:5173` akan mengarahkan ke `/scanner`.
-
-Untuk membuat build produksi frontend, jalankan `npm --prefix frontend run build`. Hasil build tersedia di `frontend/dist/`.
+Hasil build tersedia di `frontend\dist`.

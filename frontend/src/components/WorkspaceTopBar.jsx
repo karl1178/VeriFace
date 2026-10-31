@@ -35,7 +35,7 @@ export default function WorkspaceTopBar({ title }) {
   }, []);
 
   return (
-    <header className="flex min-h-[84px] items-center justify-between gap-4 border-b border-[var(--color-border)] bg-white px-9 py-[14px] max-[1100px]:px-6 max-[650px]:min-h-[74px] max-[650px]:px-[17px] max-[650px]:py-3">
+    <header className="sticky top-0 z-10 flex min-h-[84px] items-center justify-between gap-4 border-b border-[var(--color-border)] bg-white px-9 py-[14px] max-[1100px]:px-6 max-[650px]:min-h-[74px] max-[650px]:px-[17px] max-[650px]:py-3">
       <div>
         <div className="text-[10px] font-medium text-[var(--color-text-soft)]">
           Ruang Kerja <span className="px-[7px] text-[var(--color-border-subtle)]">/</span>
