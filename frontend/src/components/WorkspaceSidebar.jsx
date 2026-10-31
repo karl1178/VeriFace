@@ -1,32 +1,12 @@
-import { useEffect, useState } from "react";
 import dashboardIcon from "../assets/dashboard.svg";
 import adminIcon from "../assets/profile.svg";
 import settingsIcon from "../assets/settings.svg";
-import { apiRequest } from "../api.js";
 
 export default function WorkspaceSidebar({ activePage }) {
-  const [adminName, setAdminName] = useState("Administrator");
   const dashboardIsActive = activePage === "dashboard";
   const manageIsActive = activePage === "manage";
   const settingsIsActive = activePage === "settings";
   const navClassName = "space-y-1 max-[850px]:ml-auto max-[850px]:flex max-[850px]:space-y-0 max-[850px]:gap-1";
-
-  useEffect(() => {
-    let active = true;
-
-    apiRequest("/api/auth/me")
-      .then((data) => {
-        const name = data?.admin?.name?.trim();
-        if (active && name) setAdminName(name);
-      })
-      .catch((error) => {
-        console.error("SIDEBAR PROFILE ERROR:", error);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-20 flex w-[226px] flex-col border-r border-[var(--color-border)] bg-white px-4 pt-6 pb-5 max-[850px]:static max-[850px]:min-h-0 max-[850px]:w-auto max-[850px]:flex-row max-[850px]:items-center max-[850px]:border-r-0 max-[850px]:border-b max-[850px]:px-5 max-[850px]:py-[13px]">
@@ -70,16 +50,6 @@ export default function WorkspaceSidebar({ activePage }) {
         </a>
       </nav>
 
-      <div className="mt-auto max-[850px]:hidden">
-        <div className="flex items-center gap-[11px] px-[7px] pt-[18px]">
-          <img src={adminIcon} className="h-6 w-6 shrink-0" alt="" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-semibold text-[var(--color-ink-secondary)]">
-              {adminName}
-            </strong>
-          </span>
-        </div>
-      </div>
     </aside>
   );
 }
