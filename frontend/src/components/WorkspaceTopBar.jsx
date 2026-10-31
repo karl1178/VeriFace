@@ -1,10 +1,67 @@
 import { useEffect, useRef, useState } from "react";
 import calendarIcon from "../assets/calendar.svg";
 import notificationIcon from "../assets/notification.svg";
+import { apiRequest } from "../api.js";
+
+function formatNotificationTime(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "Waktu tidak tersedia";
+
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (elapsedMinutes < 1) return "Baru saja";
+  if (elapsedMinutes < 60) return `${elapsedMinutes} menit lalu`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours} jam lalu`;
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  return `${elapsedDays} hari lalu`;
+}
+
+function buildNotifications(logs) {
+  const attendanceLogs = logs.filter(
+    (log) =>
+      log.aktivitas === "Absen Masuk" &&
+      (log.status_proses !== "Sukses" || log.status_kehadiran === "terlambat"),
+  );
+  const groupedLogs = [];
+
+  attendanceLogs.forEach((log) => {
+    const type = log.status_proses === "Sukses" ? "late" : "failure";
+    const previousGroup = groupedLogs[groupedLogs.length - 1];
+    if (previousGroup?.type === type) {
+      previousGroup.logs.push(log);
+    } else {
+      groupedLogs.push({ type, logs: [log] });
+    }
+  });
+
+  return groupedLogs.slice(0, 5).map(({ type, logs: groupLogs }) => {
+    const latestLog = groupLogs[0];
+    const count = groupLogs.length;
+    const isLate = type === "late";
+    return {
+      id: `log-${latestLog.id}`,
+      title: `${isLate ? "Absensi terlambat" : "Absensi gagal"}${count > 1 ? ` ${count}x` : ""}`,
+      message: isLate
+        ? count > 1
+          ? `${count} absensi karyawan tercatat terlambat.`
+          : `${latestLog.nama} tercatat terlambat melakukan absensi.`
+        : "Percobaan absensi untuk Tidak Dikenal tidak dikenali.",
+      time: formatNotificationTime(latestLog.waktu_iso),
+    };
+  });
+}
 
 export default function WorkspaceTopBar({ title }) {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [readNotifications, setReadNotifications] = useState(new Set());
+  const [notifications, setNotifications] = useState([]);
+  const [notificationError, setNotificationError] = useState("");
+  const [readNotifications, setReadNotifications] = useState(() => {
+    try {
+      return new Set(JSON.parse(window.localStorage.getItem("veriface-read-notifications") || "[]"));
+    } catch {
+      return new Set();
+    }
+  });
   const notificationRef = useRef(null);
 
   const currentDate = new Intl.DateTimeFormat("id-ID", {
@@ -14,32 +71,29 @@ export default function WorkspaceTopBar({ title }) {
     day: "numeric",
   }).format(new Date());
 
-  const notifications = [
-    {
-      id: 1,
-      title: "Absensi baru",
-      message: "Kehadiran karyawan telah berhasil dicatat.",
-      time: "Baru saja",
-    },
-    {
-      id: 2,
-      title: "Karyawan diperbarui",
-      message: "Data profil karyawan berhasil diperbarui.",
-      time: "25 menit lalu",
-    },
-    {
-      id: 3,
-      title: "Sistem siap digunakan",
-      message: "Pemindaian wajah aktif dan berjalan normal.",
-      time: "1 jam lalu",
-    },
-  ];
-
   const unreadCount = notifications.filter(
     (notification) => !readNotifications.has(notification.id),
   ).length;
 
   useEffect(() => {
+    let active = true;
+
+    async function fetchNotifications() {
+      try {
+        const logs = await apiRequest("/api/logs");
+        if (!active || !Array.isArray(logs)) return;
+        setNotificationError("");
+        setNotifications(buildNotifications(logs));
+      } catch (error) {
+        if (active) {
+          setNotificationError(error instanceof Error ? error.message : "Notifikasi tidak dapat dimuat.");
+        }
+      }
+    }
+
+    fetchNotifications();
+    const refreshTimer = window.setInterval(fetchNotifications, 30000);
+
     function handleOutsideClick(event) {
       if (
         notificationRef.current &&
@@ -58,10 +112,19 @@ export default function WorkspaceTopBar({ title }) {
     document.addEventListener("mousedown", handleOutsideClick);
     document.addEventListener("keydown", handleEscape);
     return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "veriface-read-notifications",
+      JSON.stringify([...readNotifications]),
+    );
+  }, [readNotifications]);
 
   function markNotificationRead(id) {
     setReadNotifications((current) => new Set([...current, id]));
@@ -128,7 +191,15 @@ export default function WorkspaceTopBar({ title }) {
               </div>
 
               <div className="max-h-[390px] overflow-y-auto py-[5px]">
-                {notifications.map((notification) => {
+                {notificationError ? (
+                  <p className="px-[18px] py-[20px] text-center text-[10px] text-[#a85749]">
+                    {notificationError}
+                  </p>
+                ) : notifications.length === 0 ? (
+                  <p className="px-[18px] py-[20px] text-center text-[10px] text-[#89938c]">
+                    Belum ada aktivitas terbaru.
+                  </p>
+                ) : notifications.map((notification) => {
                   const isUnread = !readNotifications.has(notification.id);
                   return (
                     <button
