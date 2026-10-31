@@ -2,3 +2,6 @@ node_modules/
 frontend/dist/
 venv/
 __pycache__/
+
+deploy_plans.md
+development_plans.md

@@ -7,6 +7,11 @@ const { Pool } = require("pg");
 const crypto = require("crypto"); // Modul Kriptografi bawaan Node.js
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
+const PgSession = require("connect-pg-simple")(session);
+
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET wajib diatur di production.");
+}
 
 // --- KONFIGURASI KRIPTOGRAFI AES-256-CBC ---
 const ALGORITHM = "aes-256-cbc";
@@ -35,25 +40,50 @@ function decryptData(encryptedData) {
 }
 // -------------------------------------------
 
-const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "absensi_db",
-  password: "root", // <--- UBAH INI JADI PASSWORD POSTGRESQL ANDA
-  port: 5432,
-});
+const pool = new Pool(process.env.DATABASE_URL
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+    }
+  : {
+      user: process.env.PGUSER || "postgres",
+      host: process.env.PGHOST || "localhost",
+      database: process.env.PGDATABASE || "absensi_db",
+      password: process.env.PGPASSWORD || "root",
+      port: Number(process.env.PGPORT || 5432),
+    });
 
 const app = express();
+const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json());
+const sessionCookie = {
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: process.env.NODE_ENV === "production",
+  maxAge: 24 * 60 * 60 * 1000,
+};
+const clearSessionCookie = {
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: process.env.NODE_ENV === "production",
+};
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
 app.use(session({
   secret: process.env.SESSION_SECRET || "veriface-development-session-secret",
+  store: new PgSession({
+    pool,
+    tableName: "user_session",
+  }),
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: "lax", secure: false, maxAge: 24 * 60 * 60 * 1000 },
+  cookie: sessionCookie,
 }));
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -62,6 +92,20 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Silakan masuk terlebih dahulu." });
   }
   next();
+}
+
+function startSession(req, adminId, workspaceId) {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      req.session.adminId = adminId;
+      req.session.workspaceId = workspaceId;
+      resolve();
+    });
+  });
 }
 
 app.post("/api/auth/signup", async (req, res) => {
@@ -73,8 +117,10 @@ app.post("/api/auth/signup", async (req, res) => {
   }
 
   const client = await pool.connect();
+  let transactionStarted = false;
   try {
     await client.query("BEGIN");
+    transactionStarted = true;
     const workspaceResult = await client.query(
       "INSERT INTO workspace (nama) VALUES ($1) RETURNING id",
       [`Ruang Kerja ${name}`],
@@ -90,12 +136,12 @@ app.post("/api/auth/signup", async (req, res) => {
       [workspaceId],
     );
     await client.query("COMMIT");
+    transactionStarted = false;
 
-    req.session.adminId = adminResult.rows[0].id;
-    req.session.workspaceId = workspaceId;
+    await startSession(req, adminResult.rows[0].id, workspaceId);
     res.status(201).json({ admin: { name, email }, workspaceId });
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (transactionStarted) await client.query("ROLLBACK");
     if (error.code === "23505") {
       return res.status(409).json({ error: "Email sudah terdaftar. Silakan masuk." });
     }
@@ -120,8 +166,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
       return res.status(401).json({ error: "Email atau kata sandi salah." });
     }
-    req.session.adminId = admin.id;
-    req.session.workspaceId = admin.workspace_id;
+    await startSession(req, admin.id, admin.workspace_id);
     res.json({ admin: { id: admin.id, name: admin.nama, email: admin.email }, workspaceId: admin.workspace_id });
   } catch (error) {
     console.error("LOGIN ERROR:", error);
@@ -220,7 +265,7 @@ app.delete("/api/settings/account", requireAuth, async (req, res) => {
 
     await client.query("COMMIT");
     req.session.destroy((error) => {
-      res.clearCookie("connect.sid", { httpOnly: true, sameSite: "lax", secure: false });
+      res.clearCookie("connect.sid", clearSessionCookie);
       if (error) {
         console.error("DELETE ACCOUNT SESSION ERROR:", error);
       }
@@ -237,7 +282,7 @@ app.delete("/api/settings/account", requireAuth, async (req, res) => {
 
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((error) => {
-    res.clearCookie("connect.sid", { httpOnly: true, sameSite: "lax", secure: false });
+    res.clearCookie("connect.sid", clearSessionCookie);
     if (error) {
       console.error("LOGOUT ERROR:", error);
       return res.status(500).json({ error: "Gagal keluar." });
@@ -560,6 +605,7 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
   }
 });
 
-app.listen(5000, () => {
-  console.log("Server 1 (Express + PostgreSQL + Kriptografi AES) menyala di http://localhost:5000");
+const port = Number(process.env.PORT || 5000);
+app.listen(port, () => {
+  console.log(`Server 1 (Express + PostgreSQL + Kriptografi AES) menyala di port ${port}`);
 });

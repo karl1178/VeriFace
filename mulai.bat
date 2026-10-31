@@ -1,12 +1,7 @@
 @echo off
-title Sistem Absensi Wajah AI
-echo ===================================================
-echo     MEMULAI SISTEM ABSENSI WAJAH AI (1-KLIK)
-echo ===================================================
-
-echo.
+title Veriface
 echo [1/3] Menyalakan Server AI (FastAPI)...
-start "Server AI (FastAPI)" /MIN cmd /k "cd /d ""%~dp0ai-service"" && ""%~dp0venv\Scripts\python.exe"" -m uvicorn main:app"
+start "Server AI (FastAPI)" /MIN cmd /k ""%~dp0venv\Scripts\python.exe" -m uvicorn main:app --app-dir "%~dp0ai-service""
 
 echo.
 echo Menunggu Server AI siap...
