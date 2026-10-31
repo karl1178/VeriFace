@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import refreshIcon from "../assets/reset.svg";
 import WorkspaceSidebar from "../components/WorkspaceSidebar.jsx";
 import WorkspaceTopBar from "../components/WorkspaceTopBar.jsx";
+import SuccessToast from "../components/SuccessToast.jsx";
 import { apiRequest } from "../api.js";
 
 export default function ManageEmployeesPage() {
@@ -19,6 +20,7 @@ export default function ManageEmployeesPage() {
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState("");
+  const [successNotice, setSuccessNotice] = useState(null);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredEmployees = employees.filter((employee) =>
     employee.nama?.toLowerCase().includes(normalizedSearchQuery),
@@ -57,6 +59,12 @@ export default function ManageEmployeesPage() {
     fetchAttendanceSettings();
   }, [fetchEmployees, fetchAttendanceSettings]);
 
+  useEffect(() => {
+    if (!successNotice) return undefined;
+    const timer = window.setTimeout(() => setSuccessNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [successNotice]);
+
   async function saveAttendanceSettings(event) {
     event.preventDefault();
     setSettingsSaving(true);
@@ -69,7 +77,7 @@ export default function ManageEmployeesPage() {
       });
       setJamMasuk(data.jam_masuk);
       setZonaWaktu(data.zona_waktu);
-      setSettingsMessage("Batas waktu masuk berhasil disimpan.");
+      setSuccessNotice({ id: Date.now(), message: "Batas waktu masuk berhasil disimpan." });
     } catch (requestError) {
       setSettingsMessage(requestError instanceof Error ? requestError.message : "Gagal menyimpan pengaturan waktu masuk.");
     } finally {
@@ -104,7 +112,8 @@ export default function ManageEmployeesPage() {
       });
       setEmployees((current) => current.map((employee) => employee.id === data.id ? data : employee).sort((a, b) => a.nama.localeCompare(b.nama, "id")));
       setName(data.nama);
-      setNotice("Nama karyawan berhasil diperbarui.");
+      setNotice("");
+      setSuccessNotice({ id: Date.now(), message: "Nama karyawan berhasil diperbarui." });
       setDeletePending(false);
     } catch (requestError) {
       setNotice(requestError instanceof Error ? requestError.message : "Koneksi ke backend terputus.");
@@ -127,7 +136,8 @@ export default function ManageEmployeesPage() {
       setSelectedId(null);
       setName("");
       setDeletePending(false);
-      setNotice(data.pesan || "Data karyawan berhasil dihapus.");
+      setNotice("");
+      setSuccessNotice({ id: Date.now(), message: data.pesan || "Data karyawan berhasil dihapus." });
     } catch (requestError) {
       setNotice(requestError instanceof Error ? requestError.message : "Koneksi ke backend terputus.");
     } finally {
@@ -143,6 +153,7 @@ export default function ManageEmployeesPage() {
 
       <main className="ml-[226px] min-h-screen max-[850px]:ml-0">
         <WorkspaceTopBar title="Kelola Karyawan" />
+        <SuccessToast id={successNotice?.id} message={successNotice?.message} />
         <div className="mx-auto w-full max-w-[1440px] px-[34px] pt-[30px] pb-[38px] max-[1100px]:px-6 max-[650px]:px-[15px] max-[650px]:pt-[23px]">
           <section className="mb-4 rounded-[9px] border border-[var(--color-brand-border)] bg-white px-5 py-4 max-[650px]:px-4">
             <form onSubmit={saveAttendanceSettings} className="flex flex-wrap items-end gap-3">
@@ -165,7 +176,7 @@ export default function ManageEmployeesPage() {
                 {settingsSaving ? "Menyimpan..." : "Simpan Batas Waktu"}
               </button>
             </form>
-            {settingsMessage && <p role="status" className={`mt-3 mb-0 text-[10px] ${settingsMessage.includes("berhasil") ? "text-[var(--color-brand)]" : "text-[var(--color-danger)]"}`}>{settingsMessage}</p>}
+            {settingsMessage && <p role="alert" className="mt-3 mb-0 text-[10px] text-[var(--color-danger)]">{settingsMessage}</p>}
           </section>
 
           <section className="mb-4 flex items-center justify-between gap-4 rounded-[9px] border border-[var(--color-brand-border)] bg-white px-5 py-4 max-[650px]:items-start max-[650px]:px-4">
@@ -215,7 +226,7 @@ export default function ManageEmployeesPage() {
                 <button type="submit" disabled={saving || !name.trim()} className="h-[34px] rounded-md bg-[var(--color-brand)] px-3 text-[10px] font-semibold text-white hover:bg-[var(--color-brand-hover)] disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan Nama"}</button>
                 <button type="button" onClick={deleteEmployee} disabled={saving} className="h-[34px] rounded-md border border-[var(--color-danger-border)] bg-white px-3 text-[10px] font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger-surface)] disabled:opacity-60">{deletePending ? "Konfirmasi Hapus" : "Hapus Karyawan"}</button>
               </div>
-              {notice && <p role="status" className={`mt-3 mb-0 text-[10px] ${notice.includes("berhasil") ? "text-[var(--color-brand)]" : "text-[var(--color-danger)]"}`}>{notice}</p>}
+              {notice && <p role={notice.startsWith("Pilih Hapus") ? "status" : "alert"} className={`mt-3 mb-0 text-[10px] ${notice.startsWith("Pilih Hapus") ? "text-[var(--color-brand)]" : "text-[var(--color-danger)]"}`}>{notice}</p>}
             </form>}
             {!selectedEmployee && notice && <p role="status" className="border-t border-[var(--color-border-subtle)] px-[21px] py-3 text-[10px] text-[var(--color-brand)]">{notice}</p>}
           </section>

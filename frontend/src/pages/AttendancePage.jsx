@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../api.js";
+import SuccessToast from "../components/SuccessToast.jsx";
 
 export default function AttendancePage() {
   const videoRef = useRef(null);
@@ -123,14 +124,7 @@ export default function AttendancePage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--color-page)] px-4 py-8 text-[var(--color-ink)]">
-      {notification && (
-        <div key={notification.id} className="scanner-toast fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4" aria-live="polite">
-          <div role="status" className="flex w-full max-w-lg items-center gap-3 rounded-lg border border-[var(--color-success-border)] bg-white px-4 py-3 shadow-lg">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white" aria-hidden="true">Ã¢Å“â€œ</span>
-            <span className="text-sm font-medium text-[var(--color-brand-hover)]">{notification.message}</span>
-          </div>
-        </div>
-      )}
+      <SuccessToast id={notification?.id} message={notification?.message} />
 
       <section className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm sm:p-7">
         <div className="mb-5">
