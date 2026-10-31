@@ -3,14 +3,42 @@ import searchIcon from "../assets/search.svg";
 import refreshIcon from "../assets/reset.svg";
 import WorkspaceSidebar from "../components/WorkspaceSidebar.jsx";
 import WorkspaceTopBar from "../components/WorkspaceTopBar.jsx";
+import SuccessToast from "../components/SuccessToast.jsx";
 import { apiRequest } from "../api.js";
+
+function getDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getAttendanceStatus(status) {
+  return status === "awal" ? "Lebih Awal" : status === "terlambat" ? "Terlambat" : "-";
+}
+
+function getProcessStatus(status) {
+  return status === "Sukses" ? "Sukses" : "Tidak Dikenal";
+}
+
+function escapeCsvValue(value) {
+  const normalizedValue = String(value ?? "");
+  return `"${normalizedValue.replace(/"/g, '""')}"`;
+}
 
 export default function DashboardPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [exportError, setExportError] = useState("");
+  const [exportNotice, setExportNotice] = useState(null);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const todayKey = getDateKey(new Date());
+  const todayLogs = logs.filter((log) => {
+    const logDate = new Date(log.waktu_iso);
+    return !Number.isNaN(logDate.getTime()) && getDateKey(logDate) === todayKey;
+  });
   const filteredLogs = logs.filter((log) =>
     log.nama?.toLowerCase().includes(normalizedSearchQuery),
   );
@@ -33,12 +61,63 @@ export default function DashboardPage() {
     fetchLogs();
   }, [fetchLogs]);
 
+  useEffect(() => {
+    if (!exportError) return undefined;
+    const timer = window.setTimeout(() => setExportError(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [exportError]);
+
+  useEffect(() => {
+    if (!exportNotice) return undefined;
+    const timer = window.setTimeout(() => setExportNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [exportNotice]);
+
+  function exportTodayAttendance() {
+    if (todayLogs.length === 0) {
+      setExportError("Tidak ada kehadiran pada hari ini.");
+      return;
+    }
+
+    const headers = ["Karyawan", "Aktivitas", "Check-in", "Status", "Status Absensi"];
+    const rows = todayLogs.map((log) => [
+      log.nama,
+      log.aktivitas,
+      log.waktu,
+      getProcessStatus(log.status_proses),
+      getAttendanceStatus(log.status_kehadiran),
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsvValue).join(","))
+      .join("\r\n");
+    const blob = new Blob([`\uFEFF${csv}\r\n`], { type: "text/csv;charset=utf-8;" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `kehadiran-${todayKey}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
+    setExportNotice({ id: Date.now(), message: "Kehadiran hari ini berhasil diunduh." });
+  }
+
   return (
     <div className="min-h-screen bg-[var(--color-page)] text-[var(--color-ink)]">
       <WorkspaceSidebar activePage="dashboard" />
 
       <main className="ml-[226px] min-h-screen max-[850px]:ml-0" id="dashboard">
         <WorkspaceTopBar title="Dashboard" />
+
+        <SuccessToast id={exportNotice?.id} message={exportNotice?.message} />
+        {exportError && (
+          <div className="scanner-toast fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4" role="alert" aria-live="assertive">
+            <div className="flex w-full max-w-lg items-center gap-3 rounded-lg border border-[var(--color-danger-border)] bg-white px-4 py-3 shadow-lg">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--color-danger)] text-sm font-bold text-white" aria-hidden="true">!</span>
+              <span className="text-sm font-medium text-[var(--color-danger)]">{exportError}</span>
+            </div>
+          </div>
+        )}
 
         <div className="mx-auto w-full max-w-[1440px] px-[34px] pt-[30px] pb-[38px] max-[1100px]:px-6 max-[650px]:px-[15px] max-[650px]:pt-[23px] max-[650px]:pb-[30px]">
 
@@ -52,6 +131,15 @@ export default function DashboardPage() {
                 <a href="/scanner" className="inline-flex h-[34px] shrink-0 items-center justify-center rounded-md bg-[var(--color-brand)] px-3 text-[10px] font-semibold text-white no-underline hover:bg-[var(--color-brand-hover)]">
                   Buka Scanner
                 </a>
+                <button
+                  type="button"
+                  onClick={exportTodayAttendance}
+                  disabled={loading}
+                  className="inline-flex h-[34px] shrink-0 items-center justify-center rounded-md border border-[var(--color-border-input)] bg-white px-3 text-[10px] font-semibold text-[var(--color-ink-secondary)] transition hover:bg-[var(--color-surface-muted)] disabled:cursor-wait disabled:opacity-[0.65]"
+                  title="Unduh kehadiran hari ini dalam format CSV"
+                >
+                  Unduh CSV
+                </button>
                 <button
                   type="button"
                   onClick={fetchLogs}
@@ -96,12 +184,8 @@ export default function DashboardPage() {
                     <tr><td colSpan="5" className="h-[85px] text-center text-[10px] text-[var(--color-text-soft)]">Tidak ada karyawan dengan nama tersebut.</td></tr>
                   ) : (
                     filteredLogs.map((log, index) => {
-                      const statusAbsensi = log.status_kehadiran === "awal"
-                        ? "Lebih Awal"
-                        : log.status_kehadiran === "terlambat"
-                          ? "Terlambat"
-                          : "-";
-                      const statusProses = log.status_proses === "Sukses" ? "Sukses" : "Tidak Dikenal";
+                      const statusAbsensi = getAttendanceStatus(log.status_kehadiran);
+                      const statusProses = getProcessStatus(log.status_proses);
                       const isSuccess = log.status_proses === "Sukses";
                       return (
                         <tr key={`${log.waktu}-${log.nama}-${index}`} className="transition-colors hover:bg-[var(--color-surface-muted)]">
