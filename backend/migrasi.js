@@ -62,9 +62,21 @@ async function jalankanMigrasi() {
       END $$;
     `);
     await pool.query("ALTER TABLE pengaturan_absensi DROP COLUMN IF EXISTS id");
-    await pool.query(
-      "ALTER TABLE pengaturan_absensi ADD CONSTRAINT pengaturan_absensi_workspace_fk FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE NOT VALID",
-    ).catch(() => {});
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'pengaturan_absensi_workspace_fk'
+            AND conrelid = 'pengaturan_absensi'::regclass
+        ) THEN
+          ALTER TABLE pengaturan_absensi
+            ADD CONSTRAINT pengaturan_absensi_workspace_fk
+            FOREIGN KEY (workspace_id) REFERENCES workspace(id)
+            ON DELETE CASCADE NOT VALID;
+        END IF;
+      END $$;
+    `);
 
     await pool.query("CREATE INDEX IF NOT EXISTS idx_admin_workspace_id ON admin(workspace_id)");
     await pool.query("CREATE INDEX IF NOT EXISTS idx_karyawan_active_nama ON karyawan (workspace_id, nama, id) WHERE archived_at IS NULL");
