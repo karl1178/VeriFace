@@ -145,6 +145,96 @@ app.get("/api/auth/me", requireAuth, async (req, res) => {
   });
 });
 
+app.patch("/api/settings/profile", requireAuth, async (req, res) => {
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!name) {
+    return res.status(400).json({ error: "Nama admin wajib diisi." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE admin
+       SET nama = $1
+       WHERE id = $2 AND workspace_id = $3
+       RETURNING id, nama AS name, email`,
+      [name, req.session.adminId, req.session.workspaceId],
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Akun admin tidak ditemukan." });
+    }
+    res.json({ admin: result.rows[0] });
+  } catch (error) {
+    console.error("UPDATE PROFILE ERROR:", error);
+    res.status(500).json({ error: "Gagal mengubah nama admin." });
+  }
+});
+
+app.patch("/api/settings/password", requireAuth, async (req, res) => {
+  const currentPassword = typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+  const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+  if (!currentPassword || newPassword.length < 8) {
+    return res.status(400).json({ error: "Kata sandi lama wajib diisi dan kata sandi baru minimal 8 karakter." });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT password_hash FROM admin WHERE id = $1 AND workspace_id = $2",
+      [req.session.adminId, req.session.workspaceId],
+    );
+    const admin = result.rows[0];
+    if (!admin || !(await bcrypt.compare(currentPassword, admin.password_hash))) {
+      return res.status(401).json({ error: "Kata sandi lama salah." });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await pool.query(
+      "UPDATE admin SET password_hash = $1 WHERE id = $2 AND workspace_id = $3",
+      [passwordHash, req.session.adminId, req.session.workspaceId],
+    );
+    res.json({ message: "Kata sandi berhasil diubah." });
+  } catch (error) {
+    console.error("UPDATE PASSWORD ERROR:", error);
+    res.status(500).json({ error: "Gagal mengubah kata sandi." });
+  }
+});
+
+app.delete("/api/settings/account", requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // log_absen.karyawan_id uses ON DELETE RESTRICT, so remove logs before
+    // deleting the workspace and its cascading dependents.
+    await client.query(
+      "DELETE FROM log_absen WHERE workspace_id = $1",
+      [req.session.workspaceId],
+    );
+    const result = await client.query(
+      "DELETE FROM workspace WHERE id = $1 RETURNING id",
+      [req.session.workspaceId],
+    );
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Ruang kerja akun tidak ditemukan." });
+    }
+
+    await client.query("COMMIT");
+    req.session.destroy((error) => {
+      res.clearCookie("connect.sid", { httpOnly: true, sameSite: "lax", secure: false });
+      if (error) {
+        console.error("DELETE ACCOUNT SESSION ERROR:", error);
+      }
+      res.json({ pesan: "Akun dan seluruh data terkait berhasil dihapus." });
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("DELETE ACCOUNT ERROR:", error);
+    res.status(500).json({ error: "Gagal menghapus akun dan data terkait." });
+  } finally {
+    client.release();
+  }
+});
+
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((error) => {
     res.clearCookie("connect.sid", { httpOnly: true, sameSite: "lax", secure: false });
