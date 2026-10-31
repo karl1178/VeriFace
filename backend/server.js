@@ -193,6 +193,8 @@ app.get("/api/logs", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
+        log.id,
+        log.waktu AS waktu_iso,
         TO_CHAR(log.waktu AT TIME ZONE pengaturan_absensi.zona_waktu, 'DD/MM/YYYY HH24:MI:SS') AS waktu,
         COALESCE(karyawan.nama, 'Tidak Dikenal') AS nama,
         log.aktivitas,
