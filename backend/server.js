@@ -380,11 +380,14 @@ app.get("/api/attendance-performance", async (req, res) => {
           AND TO_CHAR(log.waktu AT TIME ZONE settings.zona_waktu, 'YYYY-MM') = $2
           AND ($3::bigint IS NULL OR log.karyawan_id = $3)
           AND log.karyawan_id IS NOT NULL
+          AND log.aktivitas = 'Absen Masuk'
           AND log.status_proses = 'Sukses'
       )
       SELECT
         employee.id,
         employee.nama,
+        employee.created_at,
+        TO_CHAR(employee.created_at AT TIME ZONE settings.zona_waktu, 'DD/MM/YYYY HH24:MI:SS') AS registered_at_tampil,
         COUNT(month_logs.id)::int AS total_attendances,
         COUNT(month_logs.id) FILTER (WHERE month_logs.status_kehadiran = 'awal')::int AS on_time,
         COUNT(month_logs.id) FILTER (WHERE month_logs.status_kehadiran = 'terlambat')::int AS late,
@@ -404,11 +407,13 @@ app.get("/api/attendance-performance", async (req, res) => {
           '[]'::json
         ) AS logs
       FROM karyawan AS employee
+      CROSS JOIN pengaturan_absensi AS settings
       LEFT JOIN month_logs ON month_logs.karyawan_id = employee.id
       WHERE employee.workspace_id = $1
+        AND settings.workspace_id = $1
         AND employee.archived_at IS NULL
         AND ($3::bigint IS NULL OR employee.id = $3)
-      GROUP BY employee.id, employee.nama
+      GROUP BY employee.id, employee.nama, employee.created_at, settings.zona_waktu
       ORDER BY employee.nama ASC, employee.id ASC
     `, [req.session.workspaceId, month, employeeId]);
 

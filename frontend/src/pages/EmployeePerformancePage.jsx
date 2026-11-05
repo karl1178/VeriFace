@@ -59,6 +59,15 @@ export default function EmployeePerformancePage() {
   }, [fetchPerformance]);
 
   const employee = employees[0];
+  const registeredAtText = employee?.registered_at_tampil || (employee?.created_at ? new Date(employee.created_at).toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }) : "");
   const metrics = useMemo(() => employee || {
     total_attendances: 0,
     on_time: 0,
@@ -122,7 +131,7 @@ export default function EmployeePerformancePage() {
                 ].map(([label, value, description]) => <div key={label} className="rounded-[9px] border border-[var(--color-border)] bg-white px-4 py-4"><p className="m-0 text-[10px] font-medium text-[var(--color-text-soft)]">{label}</p><p className="mt-2 mb-1 text-2xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">{value}</p><p className="m-0 text-[9px] text-[var(--color-text-soft)]">{description}</p></div>)}
               </section>
               <section className="mt-5 overflow-hidden rounded-[9px] border border-[var(--color-border)] bg-white">
-                <div className="border-b border-[var(--color-border-subtle)] px-5 py-4"><h3 className="m-0 text-xs font-semibold text-[var(--color-ink-secondary)]">{employee.nama}</h3><p className="mt-1 mb-0 text-[10px] text-[var(--color-text-soft)]">Riwayat kehadiran {formatMonth(month)}</p></div>
+                <div className="border-b border-[var(--color-border-subtle)] px-5 py-4"><h3 className="m-0 text-xs font-semibold text-[var(--color-ink-secondary)]">{employee.nama}</h3><p className="mt-1 mb-0 text-[10px] text-[var(--color-text-soft)]">Terdaftar: {registeredAtText || "Belum ada data pendaftaran"}</p></div>
                 <div className="overflow-x-auto"><table className="w-full min-w-[520px] border-collapse text-left text-[10px]"><thead className="bg-[var(--color-surface-muted)] text-[9px] text-[var(--color-text-soft)]"><tr><th className="px-5 py-3 font-medium">Waktu</th><th className="px-5 py-3 font-medium">Aktivitas</th><th className="px-5 py-3 font-medium">Status Absensi</th></tr></thead><tbody>{metrics.logs.length === 0 ? <tr><td colSpan="3" className="px-5 py-8 text-center text-[var(--color-text-soft)]">Belum ada kehadiran pada bulan ini.</td></tr> : metrics.logs.map((log) => <tr key={log.id} className="border-t border-[var(--color-border-subtle)]"><td className="px-5 py-3 text-[var(--color-text-muted)]">{log.waktu}</td><td className="px-5 py-3 text-[var(--color-text-muted)]">{log.aktivitas}</td><td className="px-5 py-3"><span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-medium ${log.status_kehadiran === "terlambat" ? "bg-[var(--color-danger-surface)] text-[var(--color-danger)]" : "bg-[var(--color-brand-wash)] text-[var(--color-brand)]"}`}>{log.status_kehadiran === "terlambat" ? "Terlambat" : "Tepat waktu"}</span></td></tr>)}</tbody></table></div>
               </section>
             </>

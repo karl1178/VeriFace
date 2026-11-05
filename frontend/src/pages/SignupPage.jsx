@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiRequest } from "../api.js";
+import logoWhite from "../assets/logo-white.png";
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -57,8 +58,8 @@ export default function SignupPage() {
           <div className="absolute -top-24 -right-24 h-[280px] w-[280px] rounded-full border border-white/10" />
           <div className="absolute -top-10 -right-10 h-[180px] w-[180px] rounded-full border border-white/10" />
 
-          <a href="/" className="relative z-10 text-[24px] font-bold tracking-[-0.04em] text-white no-underline">
-            VeriFace
+          <a href="/" className="relative z-10 inline-block no-underline">
+            <img src={logoWhite} className="block h-10 w-[130px] object-contain object-left" alt="VeriFace" />
           </a>
 
           <div className="relative z-10 my-auto">
@@ -74,8 +75,8 @@ export default function SignupPage() {
 
         <section className="flex w-full items-center justify-center px-6 py-10 sm:px-12 lg:w-[53%]">
           <div className="w-full max-w-[390px]">
-            <a href="/" className="mb-14 text-[22px] font-bold tracking-[-0.04em] text-[var(--color-ink)] no-underline lg:hidden">
-              VeriFace
+            <a href="/" className="mb-14 inline-block no-underline lg:hidden">
+              <img src={logoWhite} className="block h-9 w-[118px] object-contain object-left" alt="VeriFace" />
             </a>
 
             <div className="mb-7 mt-12 lg:mt-0">

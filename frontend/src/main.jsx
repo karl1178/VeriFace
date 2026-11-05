@@ -9,6 +9,7 @@ import SignupPage from "./pages/SignupPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import AttendanceHistoryPage from "./pages/AttendanceHistoryPage.jsx";
 import EmployeePerformancePage from "./pages/EmployeePerformancePage.jsx";
+import NotFoundPage from "./pages/NotFoundPage.jsx";
 import { apiRequest } from "./api.js";
 import "./index.css";
 
@@ -51,7 +52,7 @@ async function bootstrap() {
     }
   }
 
-  const Page = routes[path] ?? AttendancePage;
+  const Page = routes[path];
   createRoot(document.getElementById("root")).render(
     <React.StrictMode>
       <Page />
@@ -59,4 +60,12 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+if (!routes[path]) {
+  createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <NotFoundPage />
+    </React.StrictMode>,
+  );
+} else {
+  bootstrap();
+}
