@@ -1,3 +1,4 @@
+import logo from "../assets/logo.jpg";
 import dashboardIcon from "../assets/dashboard.svg";
 import historyIcon from "../assets/history.svg";
 import adminIcon from "../assets/profile.svg";
@@ -15,10 +16,10 @@ export default function WorkspaceSidebar({ activePage }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-20 flex w-[226px] flex-col border-r border-[var(--color-border)] bg-white px-4 pt-6 pb-5 max-[850px]:static max-[850px]:min-h-0 max-[850px]:w-auto max-[850px]:flex-row max-[850px]:items-center max-[850px]:border-r-0 max-[850px]:border-b max-[850px]:px-5 max-[850px]:py-[13px]">
       <a href="/dashboard" className="px-2 text-[23px] leading-7 font-semibold tracking-[-0.035em] text-[var(--color-ink)] no-underline max-[850px]:px-0 max-[850px]:text-xl">
-        VeriFace
+        <img src={logo} className="block h-10 w-[100px] object-contain object-left max-[850px]:h-8 max-[850px]:w-[110px]" alt="VeriFace" />
       </a>
 
-      <p className="mt-[43px] mb-[10px] mx-[11px] text-[10px] font-semibold tracking-[0.13em] text-[var(--color-text-soft)] uppercase max-[850px]:hidden">
+      <p className="mt-[30px] mb-[10px] mx-[11px] text-[10px] font-semibold tracking-[0.13em] text-[var(--color-text-soft)] uppercase max-[850px]:hidden">
         Ruang Kerja
       </p>
       <nav aria-label="Ruang kerja" className={navClassName}>
@@ -62,6 +63,7 @@ export default function WorkspaceSidebar({ activePage }) {
           <img src={peopleIcon} className="h-[18px] w-[18px] shrink-0" alt="" aria-hidden="true" />
           Kelola Karyawan
         </a>
+        <div className="mx-[11px] my-2 h-px bg-[var(--color-border-subtle)] max-[850px]:hidden" />
         <a
           href={settingsIsActive ? "#settings" : "/settings"}
           aria-current={settingsIsActive ? "page" : undefined}
