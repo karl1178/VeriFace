@@ -323,9 +323,11 @@ function handleBackendError(error, res) {
   return res.status(500).json({ error: "Terjadi kesalahan sistem" });
 }
 
-// AMBIL DATA LOG (DASHBOARD)
+// AMBIL DATA LOG (DASHBOARD DAN HALAMAN KEHADIRAN)
 app.get("/api/logs", async (req, res) => {
   try {
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 100;
     const result = await pool.query(`
       SELECT
         log.id,
@@ -341,11 +343,44 @@ app.get("/api/logs", async (req, res) => {
       WHERE pengaturan_absensi.workspace_id = $1
         AND log.workspace_id = $1
       ORDER BY log.waktu DESC, log.id DESC
-    `, [req.session.workspaceId]);
+      LIMIT $2
+    `, [req.session.workspaceId, limit]);
     res.json(result.rows);
   } catch (err) {
-    console.error("DATABASE ERROR:", err.message); // <-- Add this line!
+    console.error("DATABASE ERROR:", err.message);
     res.status(500).json({ error: "Gagal mengambil log dari database" });
+  }
+});
+
+app.get("/api/analytics", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      WITH workspace_clock AS (
+        SELECT zona_waktu, (NOW() AT TIME ZONE zona_waktu)::date AS today
+        FROM pengaturan_absensi
+        WHERE workspace_id = $1
+      )
+      SELECT
+        COUNT(*) AS total_today,
+        COUNT(DISTINCT log.karyawan_id) FILTER (WHERE log.status_proses = 'Sukses') AS present_today,
+        COUNT(*) FILTER (WHERE log.status_proses = 'Sukses') AS successful_scans,
+        COUNT(*) FILTER (WHERE log.status_kehadiran = 'awal') AS early_arrivals,
+        COUNT(*) FILTER (WHERE log.status_kehadiran = 'terlambat') AS late_arrivals
+      FROM log_absen AS log
+      CROSS JOIN workspace_clock
+      WHERE log.workspace_id = $1
+        AND (log.waktu AT TIME ZONE workspace_clock.zona_waktu)::date = workspace_clock.today
+    `, [req.session.workspaceId]);
+    res.json(result.rows[0] || {
+      total_today: "0",
+      present_today: "0",
+      successful_scans: "0",
+      early_arrivals: "0",
+      late_arrivals: "0",
+    });
+  } catch (err) {
+    console.error("ANALYTICS DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal mengambil analitik kehadiran" });
   }
 });
 
