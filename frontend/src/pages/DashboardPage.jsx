@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import searchIcon from "../assets/search.svg";
 import refreshIcon from "../assets/reset.svg";
+import downloadIcon from "../assets/download.svg";
 import WorkspaceSidebar from "../components/WorkspaceSidebar.jsx";
 import WorkspaceTopBar from "../components/WorkspaceTopBar.jsx";
 import SuccessToast from "../components/SuccessToast.jsx";
@@ -28,6 +29,7 @@ function escapeCsvValue(value) {
 
 export default function DashboardPage() {
   const [logs, setLogs] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,14 +44,19 @@ export default function DashboardPage() {
   const filteredLogs = logs.filter((log) =>
     log.nama?.toLowerCase().includes(normalizedSearchQuery),
   );
+  const visibleLogs = filteredLogs.slice(0, 6);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await apiRequest("/api/logs");
-      if (!Array.isArray(data)) throw new Error("Format data log tidak valid.");
-      setLogs(data);
+      const [logsData, analyticsData] = await Promise.all([
+        apiRequest("/api/logs?limit=100"),
+        apiRequest("/api/analytics"),
+      ]);
+      if (!Array.isArray(logsData)) throw new Error("Format data log tidak valid.");
+      setLogs(logsData);
+      setAnalytics(analyticsData);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Koneksi ke backend terputus.");
     } finally {
@@ -120,26 +127,38 @@ export default function DashboardPage() {
         )}
 
         <div className="mx-auto w-full max-w-[1440px] px-[34px] pt-[30px] pb-[38px] max-[1100px]:px-6 max-[650px]:px-[15px] max-[650px]:pt-[23px] max-[650px]:pb-[30px]">
+        <section aria-labelledby="analytics-title">
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <h2 id="analytics-title" className="m-0 text-lg font-semibold text-[var(--color-ink-secondary)]">Analitik hari ini</h2>
+            </div>
+            <a href="/scanner" className="inline-flex h-[34px] items-center justify-center rounded-md bg-[var(--color-brand)] px-3 text-[10px] font-semibold text-white no-underline hover:bg-[var(--color-brand-hover)]">
+              Buka Scanner
+            </a>
+          </div>
+          <div className="grid grid-cols-4 gap-3 max-[850px]:grid-cols-2">
+            {[
+              ["Total scan", analytics?.total_today ?? "-", "Semua aktivitas hari ini"],
+              ["Hadir", analytics?.present_today ?? "-", "Karyawan terdeteksi"],
+              ["Lebih awal", analytics?.early_arrivals ?? "-", "Check-in sebelum jam masuk"],
+              ["Terlambat", analytics?.late_arrivals ?? "-", "Check-in setelah jam masuk"],
+            ].map(([label, value, description]) => (
+              <div key={label} className="rounded-[9px] border border-[var(--color-border)] bg-white px-4 py-4">
+                <p className="m-0 text-[10px] font-medium text-[var(--color-text-soft)]">{label}</p>
+                <p className="mt-2 mb-1 text-2xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">{value}</p>
+                <p className="m-0 text-[9px] text-[var(--color-text-soft)]">{description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-          <section className="mt-[14px] overflow-hidden rounded-[9px] border border-[var(--color-border)] bg-white">
+        <section className="mt-5 overflow-hidden rounded-[9px] border border-[var(--color-border)] bg-white">
             <div className="flex min-h-[65px] items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] px-[21px] py-[13px] max-[650px]:flex-wrap max-[650px]:pr-[14px] max-[650px]:pl-[14px]">
               <div>
                 <h3 className="m-0 text-xs font-semibold text-[var(--color-ink-secondary)]">Kehadiran terbaru</h3>
                 <p className="mt-[5px] mb-0 text-[10px] text-[var(--color-text-soft)]">Check-in karyawan terbaru hari ini</p>
               </div>
               <div className="flex items-center gap-2 max-[650px]:ml-auto">
-                <a href="/scanner" className="inline-flex h-[34px] shrink-0 items-center justify-center rounded-md bg-[var(--color-brand)] px-3 text-[10px] font-semibold text-white no-underline hover:bg-[var(--color-brand-hover)]">
-                  Buka Scanner
-                </a>
-                <button
-                  type="button"
-                  onClick={exportTodayAttendance}
-                  disabled={loading}
-                  className="inline-flex h-[34px] shrink-0 items-center justify-center rounded-md border border-[var(--color-border-input)] bg-white px-3 text-[10px] font-semibold text-[var(--color-ink-secondary)] transition hover:bg-[var(--color-surface-muted)] disabled:cursor-wait disabled:opacity-[0.65]"
-                  title="Unduh kehadiran hari ini dalam format CSV"
-                >
-                  Unduh CSV
-                </button>
                 <button
                   type="button"
                   onClick={fetchLogs}
@@ -149,7 +168,7 @@ export default function DashboardPage() {
                 >
                   <img src={refreshIcon} className="h-4 w-4 shrink-0" alt="" aria-hidden="true" />
                 </button>
-                <label className="flex h-[30px] w-[203px] items-center gap-2 rounded-md border border-[var(--color-border)] px-[10px] text-[9px] text-[var(--color-text-placeholder)] max-[650px]:w-[150px] max-[650px]:shrink-0">
+                <label className="flex h-[34px] w-[203px] items-center gap-3 rounded-md border border-[var(--color-border)] px-[10px] text-[9px] text-[var(--color-text-placeholder)] max-[650px]:w-[150px] max-[650px]:shrink-0">
                   <img src={searchIcon} className="h-3 w-3 shrink-0" alt="" aria-hidden="true" />
                   <input
                     type="search"
@@ -157,9 +176,25 @@ export default function DashboardPage() {
                     placeholder="Cari karyawan"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-[10px] text-[var(--color-ink-secondary)] outline-none placeholder:text-[var(--color-text-placeholder)]"
+                    className="min-w-0 flex-1 bg-transparent text-[12px] text-[var(--color-ink-secondary)] outline-none placeholder:text-[var(--color-text-placeholder)]"
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={exportTodayAttendance}
+                  disabled={loading}
+                  className="inline-flex h-[34px] shrink-0 items-center justify-center rounded-md border border-[var(--color-border-input)] bg-white px-3 text-[10px] font-semibold text-[var(--color-ink-secondary)] transition hover:bg-[var(--color-surface-muted)] disabled:cursor-wait disabled:opacity-[0.65]"
+                  title="Unduh kehadiran hari ini dalam format CSV"
+                >
+                  <img src={downloadIcon} className="mr-1.5 h-3.5 w-3.5 shrink-0" alt="" aria-hidden="true" />
+                  Export CSV
+                </button>
+                <a href="/attendance" className="inline-flex h-[34px] shrink-0 items-center justify-center gap-1 rounded-md border border-[var(--color-border-input)] bg-white px-3 text-[10px] font-semibold text-[var(--color-ink-secondary)] no-underline hover:bg-[var(--color-surface-muted)]">
+                  Lihat semua
+                  <svg className="h-3.5 w-3.5 rotate-180" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M12.5 4.5 7 10l5.5 5.5M7.5 10h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </a>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -183,7 +218,7 @@ export default function DashboardPage() {
                   ) : filteredLogs.length === 0 ? (
                     <tr><td colSpan="5" className="h-[85px] text-center text-[10px] text-[var(--color-text-soft)]">Tidak ada karyawan dengan nama tersebut.</td></tr>
                   ) : (
-                    filteredLogs.map((log, index) => {
+                    visibleLogs.map((log, index) => {
                       const statusAbsensi = getAttendanceStatus(log.status_kehadiran);
                       const statusProses = getProcessStatus(log.status_proses);
                       const isSuccess = log.status_proses === "Sukses";
@@ -217,6 +252,12 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
+            {!loading && !error && filteredLogs.length > visibleLogs.length && (
+              <div className="flex items-center justify-between border-t border-[var(--color-border-subtle)] px-5 py-3">
+                <span className="text-[10px] text-[var(--color-text-soft)]">Menampilkan {visibleLogs.length} dari {filteredLogs.length} data</span>
+                <a href="/attendance" className="text-[10px] font-semibold text-[var(--color-brand)] no-underline hover:text-[var(--color-brand-hover)]">Buka tabel lengkap →</a>
+              </div>
+            )}
           </section>
         </div>
       </main>

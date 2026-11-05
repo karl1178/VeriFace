@@ -7,12 +7,14 @@ import ManageEmployeesPage from "./pages/ManageEmployeesPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import AttendanceHistoryPage from "./pages/AttendanceHistoryPage.jsx";
 import { apiRequest } from "./api.js";
 import "./index.css";
 
 const routes = {
   "/dashboard": DashboardPage,
   "/scanner": AttendancePage,
+  "/attendance": AttendanceHistoryPage,
   "/register": RegisterPage,
   "/manage": ManageEmployeesPage,
   "/login": LoginPage,
