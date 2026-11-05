@@ -1,6 +1,7 @@
 import dashboardIcon from "../assets/dashboard.svg";
 import historyIcon from "../assets/history.svg";
 import adminIcon from "../assets/profile.svg";
+import peopleIcon from "../assets/people.svg";
 import settingsIcon from "../assets/settings.svg";
 
 export default function WorkspaceSidebar({ activePage }) {
@@ -8,6 +9,7 @@ export default function WorkspaceSidebar({ activePage }) {
   const manageIsActive = activePage === "manage";
   const settingsIsActive = activePage === "settings";
   const attendanceIsActive = activePage === "attendance";
+  const performanceIsActive = activePage === "performance";
   const navClassName = "space-y-1 max-[850px]:ml-auto max-[850px]:flex max-[850px]:space-y-0 max-[850px]:gap-1";
 
   return (
@@ -41,13 +43,23 @@ export default function WorkspaceSidebar({ activePage }) {
           Riwayat Kehadiran
         </a>
         <a
+          href="/performance"
+          aria-current={performanceIsActive ? "page" : undefined}
+          className={performanceIsActive
+            ? "flex h-[37px] items-center gap-[11px] rounded-md bg-[var(--color-brand-wash)] px-[11px] text-xs font-semibold text-[var(--color-brand-hover)] no-underline max-[850px]:h-[34px]"
+            : "mt-1 flex h-[37px] items-center gap-[11px] rounded-md px-[11px] text-xs font-medium text-[var(--color-text-muted)] no-underline transition hover:bg-[var(--color-page)] hover:text-[var(--color-brand-hover)] max-[850px]:mt-0 max-[850px]:h-[34px]"}
+        >
+          <img src={adminIcon} className="h-[18px] w-[18px] shrink-0" alt="" aria-hidden="true" />
+          Performa Karyawan
+        </a>
+        <a
           href="/manage"
           aria-current={manageIsActive ? "page" : undefined}
           className={manageIsActive
             ? "flex h-[37px] items-center gap-[11px] rounded-md bg-[var(--color-brand-wash)] px-[11px] text-xs font-semibold text-[var(--color-brand-hover)] no-underline max-[850px]:h-[34px]"
             : "mt-1 flex h-[37px] items-center gap-[11px] rounded-md px-[11px] text-xs font-medium text-[var(--color-text-muted)] no-underline transition hover:bg-[var(--color-page)] hover:text-[var(--color-brand-hover)] max-[850px]:mt-0 max-[850px]:h-[34px]"}
         >
-          <img src={adminIcon} className="h-[18px] w-[18px] shrink-0" alt="" aria-hidden="true" />
+          <img src={peopleIcon} className="h-[18px] w-[18px] shrink-0" alt="" aria-hidden="true" />
           Kelola Karyawan
         </a>
         <a

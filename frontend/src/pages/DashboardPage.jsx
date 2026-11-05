@@ -255,7 +255,6 @@ export default function DashboardPage() {
             {!loading && !error && filteredLogs.length > visibleLogs.length && (
               <div className="flex items-center justify-between border-t border-[var(--color-border-subtle)] px-5 py-3">
                 <span className="text-[10px] text-[var(--color-text-soft)]">Menampilkan {visibleLogs.length} dari {filteredLogs.length} data</span>
-                <a href="/attendance" className="text-[10px] font-semibold text-[var(--color-brand)] no-underline hover:text-[var(--color-brand-hover)]">Buka tabel lengkap →</a>
               </div>
             )}
           </section>

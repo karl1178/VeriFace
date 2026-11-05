@@ -352,6 +352,79 @@ app.get("/api/logs", async (req, res) => {
   }
 });
 
+app.get("/api/attendance-performance", async (req, res) => {
+  const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month)
+    ? req.query.month
+    : null;
+  const employeeId = req.query.employee_id ? Number(req.query.employee_id) : null;
+  if (!month) return res.status(400).json({ error: "Bulan tidak valid." });
+  if (req.query.employee_id && (!Number.isInteger(employeeId) || employeeId < 1)) {
+    return res.status(400).json({ error: "ID karyawan tidak valid." });
+  }
+
+  try {
+    const result = await pool.query(`
+      WITH month_logs AS (
+        SELECT
+          log.id,
+          log.karyawan_id,
+          log.waktu,
+          log.aktivitas,
+          log.status_proses,
+          log.status_kehadiran,
+          TO_CHAR(log.waktu AT TIME ZONE settings.zona_waktu, 'DD/MM/YYYY HH24:MI:SS') AS waktu_tampil
+        FROM log_absen AS log
+        CROSS JOIN pengaturan_absensi AS settings
+        WHERE log.workspace_id = $1
+          AND settings.workspace_id = $1
+          AND TO_CHAR(log.waktu AT TIME ZONE settings.zona_waktu, 'YYYY-MM') = $2
+          AND ($3::bigint IS NULL OR log.karyawan_id = $3)
+          AND log.karyawan_id IS NOT NULL
+          AND log.status_proses = 'Sukses'
+      )
+      SELECT
+        employee.id,
+        employee.nama,
+        COUNT(month_logs.id)::int AS total_attendances,
+        COUNT(month_logs.id) FILTER (WHERE month_logs.status_kehadiran = 'awal')::int AS on_time,
+        COUNT(month_logs.id) FILTER (WHERE month_logs.status_kehadiran = 'terlambat')::int AS late,
+        COALESCE(ROUND(
+          COUNT(month_logs.id) FILTER (WHERE month_logs.status_kehadiran = 'awal') * 100.0
+          / NULLIF(COUNT(month_logs.id), 0), 1
+        ), 0)::float AS on_time_percentage,
+        COALESCE(
+          JSON_AGG(JSON_BUILD_OBJECT(
+            'id', month_logs.id,
+            'waktu', month_logs.waktu_tampil,
+            'waktu_iso', month_logs.waktu,
+            'aktivitas', month_logs.aktivitas,
+            'status_kehadiran', month_logs.status_kehadiran
+          ) ORDER BY month_logs.waktu DESC, month_logs.id DESC)
+          FILTER (WHERE month_logs.id IS NOT NULL),
+          '[]'::json
+        ) AS logs
+      FROM karyawan AS employee
+      LEFT JOIN month_logs ON month_logs.karyawan_id = employee.id
+      WHERE employee.workspace_id = $1
+        AND employee.archived_at IS NULL
+        AND ($3::bigint IS NULL OR employee.id = $3)
+      GROUP BY employee.id, employee.nama
+      ORDER BY employee.nama ASC, employee.id ASC
+    `, [req.session.workspaceId, month, employeeId]);
+
+    res.json({
+      month,
+      employees: result.rows.map((row) => ({
+        ...row,
+        logs: Array.isArray(row.logs) ? row.logs : [],
+      })),
+    });
+  } catch (err) {
+    console.error("ATTENDANCE PERFORMANCE DATABASE ERROR:", err.message);
+    res.status(500).json({ error: "Gagal mengambil performa kehadiran karyawan." });
+  }
+});
+
 app.get("/api/analytics", async (req, res) => {
   try {
     const result = await pool.query(`
