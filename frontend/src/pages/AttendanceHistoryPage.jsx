@@ -101,7 +101,7 @@ export default function AttendanceHistoryPage() {
                       </select>
                     </label>
                     <label className="grid gap-1 text-[9px] font-medium text-[var(--color-text-muted)]">
-                      Status absensi
+                      Status Absensi
                       <select
                         value={attendanceFilter}
                         onChange={(event) => {

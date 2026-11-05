@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import searchIcon from "../assets/search.svg";
 import refreshIcon from "../assets/reset.svg";
 import WorkspaceSidebar from "../components/WorkspaceSidebar.jsx";
 import WorkspaceTopBar from "../components/WorkspaceTopBar.jsx";
@@ -197,23 +198,23 @@ export default function ManageEmployeesPage() {
                 <button type="button" onClick={fetchEmployees} disabled={loading} className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-[var(--color-border-input)] bg-white text-[10px] font-semibold text-[var(--color-ink-secondary)] transition hover:bg-[var(--color-surface-muted)] disabled:cursor-wait disabled:opacity-[0.65]" title="Segarkan data karyawan" aria-label="Segarkan data karyawan">
                   <img src={refreshIcon} className="h-4 w-4 shrink-0" alt="" aria-hidden="true" />
                 </button>
-                <label className="flex h-[30px] w-[203px] items-center gap-2 rounded-md border border-[var(--color-border)] px-[10px] text-[9px] text-[var(--color-text-placeholder)] max-[650px]:w-[150px] max-[650px]:shrink-0">
-                  <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                  <input type="search" aria-label="Cari karyawan berdasarkan nama" placeholder="Cari karyawan" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[10px] text-[var(--color-ink-secondary)] outline-none placeholder:text-[var(--color-text-placeholder)]" />
+                <label className="flex h-[34px] w-[203px] items-center gap-3 rounded-md border border-[var(--color-border)] px-[10px] text-[9px] text-[var(--color-text-placeholder)] max-[650px]:w-[150px] max-[650px]:shrink-0">
+                  <img src={searchIcon} className="h-3 w-3 shrink-0" alt="" aria-hidden="true" />
+                  <input type="search" aria-label="Cari karyawan berdasarkan nama" placeholder="Cari karyawan" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[12px] text-[var(--color-ink-secondary)] outline-none placeholder:text-[var(--color-text-placeholder)]" />
                 </label>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[400px] border-collapse text-left">
-                <thead className="bg-[var(--color-surface-muted)] text-[9px] font-medium text-[var(--color-text-soft)]"><tr><th className="px-5 py-[9px] pl-[21px] font-medium" scope="col">Nama karyawan</th><th className="px-5 py-[9px] font-medium" scope="col">ID</th></tr></thead>
+                <thead className="bg-[var(--color-surface-muted)] text-[9px] font-medium text-[var(--color-text-soft)]"><tr><th className="w-[72px] whitespace-nowrap px-5 py-[9px] pl-[21px] font-medium" scope="col">ID</th><th className="px-5 py-[9px] font-medium" scope="col">Nama</th></tr></thead>
                 <tbody>
                   {loading ? <tr><td colSpan="2" className="h-[85px] text-center text-[10px] text-[var(--color-text-soft)]">Memuat data karyawan...</td></tr>
                     : error ? <tr><td colSpan="2" className="h-[85px] text-center text-[10px] text-[var(--color-danger)]">{error}</td></tr>
                       : employees.length === 0 ? <tr><td colSpan="2" className="h-[85px] text-center text-[10px] text-[var(--color-text-soft)]">Belum ada karyawan. Gunakan tombol Buka Registrasi untuk menambahkan.</td></tr>
                         : filteredEmployees.length === 0 ? <tr><td colSpan="2" className="h-[85px] text-center text-[10px] text-[var(--color-text-soft)]">Tidak ada karyawan dengan nama tersebut.</td></tr>
                           : filteredEmployees.map((employee) => <tr key={employee.id} onClick={() => selectEmployee(employee)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectEmployee(employee); } }} tabIndex={0} aria-selected={selectedId === employee.id} className={`cursor-pointer transition-colors hover:bg-[var(--color-brand-wash)] ${selectedId === employee.id ? "bg-[var(--color-brand-wash)]" : ""}`}>
-                          <td className="border-b border-[var(--color-border-subtle)] py-[10px] pr-4 pl-[21px] text-[10px] text-[var(--color-ink-secondary)]"><div className="flex items-center gap-[10px]"><span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-full bg-[var(--color-brand-soft)] text-[8px] font-semibold text-[var(--color-brand)]">{employee.nama?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2)}</span><strong className="font-semibold">{employee.nama}</strong></div></td>
-                          <td className="border-b border-[var(--color-border-subtle)] px-5 py-[10px] text-[10px] text-[var(--color-text-muted)]">{employee.id}</td>
+                          <td className="w-[72px] whitespace-nowrap border-b border-[var(--color-border-subtle)] py-[10px] pr-4 pl-[21px] text-[10px] text-[var(--color-text-muted)]">{employee.id}</td>
+                          <td className="border-b border-[var(--color-border-subtle)] px-5 py-[10px] text-[10px] text-[var(--color-ink-secondary)]"><div className="flex items-center gap-[10px]"><span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-full bg-[var(--color-brand-soft)] text-[8px] font-semibold text-[var(--color-brand)]">{employee.nama?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2)}</span><strong className="font-semibold">{employee.nama}</strong></div></td>
                         </tr>)}
                 </tbody>
               </table>

@@ -220,11 +220,11 @@ export default function SettingsPage() {
                     <h3 className="m-0 text-[11px] font-semibold text-[var(--color-danger)]">Hapus akun saya</h3>
                     <p className="mt-[4px] mb-0 text-[9px] leading-[1.4] text-[var(--color-text-soft)]">Hapus akun secara permanen dan cabut akses dari semua ruang kerja.</p>
                   </div>
-                  <button type="button" onClick={deleteAccount} disabled={isDeletingAccount} className="h-[32px] shrink-0 rounded-[5px] border border-[var(--color-danger-border)] bg-[var(--color-surface-danger)] px-[11px] text-[10px] font-semibold text-[var(--color-danger)] hover:border-[var(--color-danger)] hover:bg-[var(--color-danger-surface)] disabled:cursor-not-allowed disabled:opacity-70">
+                  <button type="button" onClick={deleteAccount} disabled={isDeletingAccount} className="h-[34px] rounded-md border border-[var(--color-danger-border)] bg-white px-3 text-[10px] font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger-surface)] disabled:opacity-60">
                     {isDeletingAccount ? "Menghapus..." : deleteAccountPending ? "Konfirmasi Hapus" : "Hapus Akun"}
                   </button>
                 </div>
-                {deleteAccountNotice && <p role={deleteAccountPending ? "status" : "alert"} className="mt-3 mb-0 text-[10px] text-[var(--color-danger)]">{deleteAccountNotice}</p>}
+                {deleteAccountNotice && <p role={deleteAccountPending ? "status" : "alert"} className={`mt-3 mb-0 text-[10px] ${deleteAccountPending ? "text-[var(--color-brand)]" : "text-[var(--color-danger)]"}`}>{deleteAccountNotice}</p>}
               </div>
             </div>
           </section>
