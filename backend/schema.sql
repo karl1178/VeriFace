@@ -18,6 +18,8 @@ CREATE TABLE admin (
     nama TEXT NOT NULL CHECK (BTRIM(nama) <> ''),
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    mfa_secret TEXT,
+    mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

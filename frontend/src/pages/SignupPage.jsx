@@ -11,6 +11,13 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mfaSetup, setMfaSetup] = useState(null);
+  const [mfaToken, setMfaToken] = useState("");
+
+  async function loadMfaSetup() {
+    const setup = await apiRequest("/api/auth/mfa/setup");
+    setMfaSetup(setup);
+  }
 
   async function submitSignup(event) {
     event.preventDefault();
@@ -25,14 +32,36 @@ export default function SignupPage() {
     setLoading(true);
     setError("");
     try {
-      await apiRequest("/api/auth/signup", {
+      const result = await apiRequest("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
       });
+      if (result.mfaSetupRequired) {
+        await loadMfaSetup();
+        return;
+      }
       window.location.href = "/dashboard";
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Gagal membuat akun.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitMfa(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await apiRequest("/api/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: mfaToken }),
+      });
+      window.location.href = "/login";
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Gagal memverifikasi kode.");
     } finally {
       setLoading(false);
     }
@@ -81,11 +110,11 @@ export default function SignupPage() {
 
             <div className="mb-7 mt-12 lg:mt-0">
               <h1 className="m-0 text-[28px] leading-tight font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
-                Daftar sebagai Admin
+                {mfaSetup ? "Aktifkan keamanan akun" : "Daftar sebagai Admin"}
               </h1>
             </div>
 
-            <form className="space-y-4" onSubmit={submitSignup}>
+            {!mfaSetup ? <form className="space-y-4" onSubmit={submitSignup}>
               <div>
                 <label className="mb-2 block text-[12px] font-semibold text-[var(--color-ink-secondary)]" htmlFor="name">
                   Nama
@@ -181,8 +210,28 @@ export default function SignupPage() {
               >
                 {loading ? "Memproses..." : "Daftar"}
               </button>
-              {error && <p role="alert" className="text-center text-[12px] text-[var(--color-danger)]">{error}</p>}
-            </form>
+            </form> : <form className="space-y-5" onSubmit={submitMfa}>
+              <p className="text-[13px] leading-6 text-[var(--color-ink-secondary)]">
+                Pindai QR ini dengan Google Authenticator atau Microsoft Authenticator, lalu masukkan kode 6 angka untuk menyelesaikan pendaftaran.
+              </p>
+              <img src={mfaSetup.qrCode} alt="QR code MFA" className="mx-auto h-48 w-48 rounded border p-2" />
+              <p className="break-all rounded bg-[var(--color-surface-muted)] p-3 text-center text-xs">{mfaSetup.secret}</p>
+              <input
+                value={mfaToken}
+                onChange={(event) => setMfaToken(event.target.value)}
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                required
+                autoFocus
+                placeholder="Kode 6 angka"
+                className="h-[48px] w-full rounded-lg border border-[var(--color-border-input)] bg-white px-4 text-center text-[13px] tracking-[0.3em] text-[var(--color-ink)] outline-none transition placeholder:text-[var(--color-text-placeholder)] focus:border-[var(--color-brand)] focus:ring-4 focus:ring-[var(--color-brand-wash)]"
+              />
+              <button type="submit" disabled={loading} className="h-[48px] w-full rounded-lg border-0 bg-[var(--color-brand)] text-[13px] font-semibold text-white transition hover:bg-[var(--color-brand-hover)] active:bg-[var(--color-brand)]">
+                {loading ? "Memverifikasi..." : "Selesaikan pendaftaran"}
+              </button>
+            </form>}
+            {error && <p role="alert" className="text-center text-[12px] text-[var(--color-danger)]">{error}</p>}
 
             <p className="mt-6 mb-0 text-center text-[12px] text-[var(--color-text-soft)]">
               Already have an account?

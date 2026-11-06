@@ -8,20 +8,51 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mfaStep, setMfaStep] = useState("credentials");
+  const [mfaToken, setMfaToken] = useState("");
+  const [mfaSetup, setMfaSetup] = useState(null);
+
+  async function loadMfaSetup() {
+    const setup = await apiRequest("/api/auth/mfa/setup");
+    setMfaSetup(setup);
+  }
 
   async function submitLogin(event) {
     event.preventDefault();
     setLoading(true);
     setError("");
     try {
-      await apiRequest("/api/auth/login", {
+      const result = await apiRequest("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      window.location.href = "/dashboard";
+      if (result.mfaSetupRequired) {
+        await loadMfaSetup();
+        setMfaStep("setup");
+        return;
+      }
+      setMfaStep("token");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Gagal masuk.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitMfa(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const result = await apiRequest("/api/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: mfaToken }),
+      });
+      window.location.href = result.setupComplete ? "/login" : "/dashboard";
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Gagal memverifikasi kode.");
     } finally {
       setLoading(false);
     }
@@ -57,11 +88,11 @@ export default function LoginPage() {
 
             <div className="mb-8 mt-12 lg:mt-0">
               <h1 className="m-0 text-[28px] leading-tight font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
-                Masuk sebagai Admin
+                {mfaStep === "setup" ? "Aktifkan keamanan akun" : "Masuk sebagai Admin"}
               </h1>
             </div>
 
-            <form className="space-y-5" onSubmit={submitLogin}>
+            {mfaStep === "credentials" && <form className="space-y-5" onSubmit={submitLogin}>
               <div>
                 <label className="mb-2 block text-[12px] font-semibold text-[var(--color-ink-secondary)]" htmlFor="email">
                   Email
@@ -127,8 +158,37 @@ export default function LoginPage() {
               >
                 {loading ? "Memproses..." : "Masuk"}
               </button>
-              {error && <p role="alert" className="text-center text-[12px] text-[var(--color-danger)]">{error}</p>}
-            </form>
+            </form>}
+            {mfaStep === "setup" && mfaSetup && <form className="space-y-5" onSubmit={submitMfa}>
+              <p className="text-[13px] leading-6 text-[var(--color-ink-secondary)]">
+                Pindai QR ini dengan Google Authenticator atau Microsoft Authenticator, lalu masukkan kode 6 angka.
+              </p>
+              <img src={mfaSetup.qrCode} alt="QR code MFA" className="mx-auto h-48 w-48 rounded border p-2" />
+              <p className="break-all rounded bg-[var(--color-surface-muted)] p-3 text-center text-xs">{mfaSetup.secret}</p>
+              <input value={mfaToken} onChange={(event) => setMfaToken(event.target.value)} inputMode="numeric" pattern="\d{6}" maxLength={6} required autoFocus placeholder="Kode 6 angka" className="h-[48px] w-full rounded-lg border border-[var(--color-border-input)] bg-white px-4 text-center text-[13px] tracking-[0.3em] text-[var(--color-ink)] outline-none transition placeholder:text-[var(--color-text-placeholder)] focus:border-[var(--color-brand)] focus:ring-4 focus:ring-[var(--color-brand-wash)]" />
+              <button type="submit" disabled={loading} className="h-[48px] w-full rounded-lg border-0 bg-[var(--color-brand)] text-[13px] font-semibold text-white transition hover:bg-[var(--color-brand-hover)] active:bg-[var(--color-brand)]">
+                {loading ? "Memverifikasi..." : "Aktifkan MFA"}
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setMfaStep("credentials");
+                  setMfaSetup(null);
+                  setMfaToken("");
+                  setError("");
+                }}
+                className="w-full border-0 bg-transparent text-[12px] font-semibold text-[var(--color-text-soft)] hover:text-[var(--color-brand)]"
+              >
+                Kembali ke login
+              </button>
+            </form>}
+            {mfaStep === "token" && <form className="space-y-5" onSubmit={submitMfa}>
+              <p className="text-[13px] leading-6 text-[var(--color-ink-secondary)]">Masukkan kode 6 angka dari aplikasi autentikator Anda.</p>
+              <input value={mfaToken} onChange={(event) => setMfaToken(event.target.value)} inputMode="numeric" pattern="\d{6}" maxLength={6} required autoFocus placeholder="Kode 6 angka" className="h-[48px] w-full rounded-lg border border-[var(--color-border-input)] bg-white px-4 text-center text-[13px] text-[var(--color-ink)] tracking-[0.3em] outline-none transition placeholder:text-[var(--color-text-placeholder)] focus:border-[var(--color-brand)] focus:ring-4 focus:ring-[var(--color-brand-wash)]" />
+              <button type="submit" disabled={loading} className="h-[48px] w-full rounded-lg border-0 bg-[var(--color-brand)] text-[13px] font-semibold text-white transition hover:bg-[var(--color-brand-hover)] active:bg-[var(--color-brand)] focus:outline-none focus:ring-4 focus:ring-[var(--color-brand-wash)]">{loading ? "Memverifikasi..." : "Verifikasi"}</button>
+            </form>}
+            {error && <p role="alert" className="mt-3 text-center text-[12px] text-[var(--color-danger)]">{error}</p>}
 
             <p className="mt-6 mb-0 text-center text-[12px] text-[var(--color-text-soft)]">
               Don't have an account?

@@ -1,4 +1,12 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
+
 const { Pool } = require("pg");
+
+function requireEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} wajib diatur di file .env.`);
+  return value;
+}
 
 const pool = new Pool(process.env.DATABASE_URL
   ? {
@@ -6,11 +14,11 @@ const pool = new Pool(process.env.DATABASE_URL
       ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
     }
   : {
-      user: process.env.PGUSER || "postgres",
-      host: process.env.PGHOST || "localhost",
-      database: process.env.PGDATABASE || "absensi_db",
-      password: process.env.PGPASSWORD || "root",
-      port: Number(process.env.PGPORT || 5432),
+      user: requireEnv("PGUSER"),
+      host: requireEnv("PGHOST"),
+      database: requireEnv("PGDATABASE"),
+      password: requireEnv("PGPASSWORD"),
+      port: Number(requireEnv("PGPORT")),
     });
 
 async function jalankanMigrasi() {
@@ -33,9 +41,13 @@ async function jalankanMigrasi() {
         nama TEXT NOT NULL CHECK (BTRIM(nama) <> ''),
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
+        mfa_secret TEXT,
+        mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query("ALTER TABLE admin ADD COLUMN IF NOT EXISTS mfa_secret TEXT");
+    await pool.query("ALTER TABLE admin ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE");
 
     const workspaceResult = await pool.query(
       `INSERT INTO workspace (nama)

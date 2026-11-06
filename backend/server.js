@@ -1,3 +1,5 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
+
 const express = require("express");
 const multer = require("multer");
 const axios = require("axios");
@@ -8,15 +10,27 @@ const crypto = require("crypto"); // Modul Kriptografi bawaan Node.js
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
 const PgSession = require("connect-pg-simple")(session);
+const { generateSecret, generateSync, generateURI, verifySync } = require("otplib");
+const QRCode = require("qrcode");
 
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
-  throw new Error("SESSION_SECRET wajib diatur di production.");
+const FACE_ANGLES = ["front", "left", "right"];
+
+function requireEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} wajib diatur di file .env.`);
+  return value;
 }
 
 // --- KONFIGURASI KRIPTOGRAFI AES-256-CBC ---
 const ALGORITHM = "aes-256-cbc";
-// Kunci rahasia harus 32 karakter (256 bit). Di dunia nyata, ini disimpan di file .env
-const SECRET_KEY = crypto.createHash("sha256").update("KunciRahasiaVeriFaceTugasKripto").digest("base64").substring(0, 32);
+const ENCRYPTION_KEY = requireEnv("ENCRYPTION_KEY");
+const SESSION_SECRET = requireEnv("SESSION_SECRET");
+const SECRET_KEY = crypto.createHash("sha256").update(ENCRYPTION_KEY, "utf8").digest();
+const LEGACY_SECRET_KEY = Buffer.from(
+  crypto.createHash("sha256").update("KunciRahasiaVeriFaceTugasKripto").digest("base64").substring(0, 32),
+  "utf8",
+);
+const AI_SERVICE_URL = requireEnv("AI_SERVICE_URL").replace(/\/+$/, "");
 
 // Fungsi Enkripsi
 function encryptData(text) {
@@ -29,14 +43,23 @@ function encryptData(text) {
 }
 
 // Fungsi Dekripsi
-function decryptData(encryptedData) {
+function decryptDataWithKey(encryptedData, key) {
   const parts = encryptedData.split(":");
   const iv = Buffer.from(parts.shift(), "hex");
   const encryptedText = Buffer.from(parts.join(":"), "hex");
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(SECRET_KEY), iv);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   let decrypted = decipher.update(encryptedText, "hex", "utf8");
   decrypted += decipher.final("utf8");
   return decrypted;
+}
+
+function decryptData(encryptedData) {
+  try {
+    return decryptDataWithKey(encryptedData, SECRET_KEY);
+  } catch (error) {
+    if (SECRET_KEY.equals(LEGACY_SECRET_KEY)) throw error;
+    return decryptDataWithKey(encryptedData, LEGACY_SECRET_KEY);
+  }
 }
 // -------------------------------------------
 
@@ -46,15 +69,15 @@ const pool = new Pool(process.env.DATABASE_URL
       ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
     }
   : {
-      user: process.env.PGUSER || "postgres",
-      host: process.env.PGHOST || "localhost",
-      database: process.env.PGDATABASE || "absensi_db",
-      password: process.env.PGPASSWORD || "root",
-      port: Number(process.env.PGPORT || 5432),
+      user: requireEnv("PGUSER"),
+      host: requireEnv("PGHOST"),
+      database: requireEnv("PGDATABASE"),
+      password: requireEnv("PGPASSWORD"),
+      port: Number(requireEnv("PGPORT")),
     });
 
 const app = express();
-const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+const allowedOrigins = requireEnv("CLIENT_ORIGIN")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -76,7 +99,7 @@ const clearSessionCookie = {
 };
 if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
 app.use(session({
-  secret: process.env.SESSION_SECRET || "veriface-development-session-secret",
+  secret: SESSION_SECRET,
   store: new PgSession({
     pool,
     tableName: "user_session",
@@ -87,9 +110,25 @@ app.use(session({
 }));
 const upload = multer({ storage: multer.memoryStorage() });
 
+async function extractFaceFeature(buffer, filename) {
+  const form = new FormData();
+  form.append("image", buffer, { filename, contentType: "image/jpeg" });
+  const response = await axios.post(`${AI_SERVICE_URL}/extract-feature`, form, {
+    headers: form.getHeaders(),
+  });
+  return response.data;
+}
+
 function requireAuth(req, res, next) {
   if (!req.session.adminId || !req.session.workspaceId) {
     return res.status(401).json({ error: "Silakan masuk terlebih dahulu." });
+  }
+  next();
+}
+
+function requirePendingAuth(req, res, next) {
+  if (!req.session.mfaPendingAdminId || !req.session.mfaPendingWorkspaceId) {
+    return res.status(401).json({ error: "Sesi verifikasi MFA tidak ditemukan." });
   }
   next();
 }
@@ -103,9 +142,35 @@ function startSession(req, adminId, workspaceId) {
       }
       req.session.adminId = adminId;
       req.session.workspaceId = workspaceId;
+      delete req.session.mfaPendingAdminId;
+      delete req.session.mfaPendingWorkspaceId;
+      delete req.session.mfaSetupSecret;
       resolve();
     });
   });
+}
+
+function startPendingSession(req, adminId, workspaceId) {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      req.session.mfaPendingAdminId = adminId;
+      req.session.mfaPendingWorkspaceId = workspaceId;
+      resolve();
+    });
+  });
+}
+
+function isValidMfaToken(secret, token) {
+  if (typeof secret !== "string" || !secret || typeof token !== "string") {
+    return false;
+  }
+
+  const verification = verifySync({ token, secret });
+  return verification?.valid === true;
 }
 
 app.post("/api/auth/signup", async (req, res) => {
@@ -138,8 +203,8 @@ app.post("/api/auth/signup", async (req, res) => {
     await client.query("COMMIT");
     transactionStarted = false;
 
-    await startSession(req, adminResult.rows[0].id, workspaceId);
-    res.status(201).json({ admin: { name, email }, workspaceId });
+    await startPendingSession(req, adminResult.rows[0].id, workspaceId);
+    res.status(201).json({ mfaSetupRequired: true, admin: { name, email }, workspaceId });
   } catch (error) {
     if (transactionStarted) await client.query("ROLLBACK");
     if (error.code === "23505") {
@@ -159,18 +224,84 @@ app.post("/api/auth/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT id, workspace_id, nama, email, password_hash FROM admin WHERE email = $1",
+      "SELECT id, workspace_id, nama, email, password_hash, mfa_enabled FROM admin WHERE email = $1",
       [email],
     );
     const admin = result.rows[0];
     if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
       return res.status(401).json({ error: "Email atau kata sandi salah." });
     }
-    await startSession(req, admin.id, admin.workspace_id);
-    res.json({ admin: { id: admin.id, name: admin.nama, email: admin.email }, workspaceId: admin.workspace_id });
+    await startPendingSession(req, admin.id, admin.workspace_id);
+    res.json({
+      mfaRequired: Boolean(admin.mfa_enabled),
+      mfaSetupRequired: !admin.mfa_enabled,
+      admin: { id: admin.id, name: admin.nama, email: admin.email },
+      workspaceId: admin.workspace_id,
+    });
   } catch (error) {
     console.error("LOGIN ERROR:", error);
     res.status(500).json({ error: "Gagal masuk." });
+  }
+});
+
+app.get("/api/auth/mfa/setup", requirePendingAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT email, mfa_enabled FROM admin WHERE id = $1 AND workspace_id = $2",
+      [req.session.mfaPendingAdminId, req.session.mfaPendingWorkspaceId],
+    );
+    if (!result.rowCount) return res.status(401).json({ error: "Akun tidak ditemukan." });
+    if (result.rows[0].mfa_enabled) return res.status(409).json({ error: "MFA sudah aktif. Masukkan kode autentikator." });
+
+    if (!req.session.mfaSetupSecret) req.session.mfaSetupSecret = generateSecret();
+    const uri = generateURI({
+      secret: req.session.mfaSetupSecret,
+      issuer: "VeriFace",
+      label: result.rows[0].email,
+    });
+    const qrCode = await QRCode.toDataURL(uri);
+    res.json({ qrCode, secret: req.session.mfaSetupSecret });
+  } catch (error) {
+    console.error("MFA SETUP ERROR:", error);
+    res.status(500).json({ error: "Gagal menyiapkan MFA." });
+  }
+});
+
+app.post("/api/auth/mfa/verify", requirePendingAuth, async (req, res) => {
+  const token = typeof req.body?.token === "string" ? req.body.token.replace(/\s/g, "") : "";
+  if (!/^\d{6}$/.test(token)) return res.status(400).json({ error: "Kode autentikator harus terdiri dari 6 angka." });
+
+  try {
+    const result = await pool.query(
+      "SELECT id, workspace_id, nama, email, mfa_enabled, mfa_secret FROM admin WHERE id = $1 AND workspace_id = $2",
+      [req.session.mfaPendingAdminId, req.session.mfaPendingWorkspaceId],
+    );
+    const admin = result.rows[0];
+    if (!admin) return res.status(401).json({ error: "Akun tidak ditemukan." });
+
+    const secret = admin.mfa_enabled ? decryptData(admin.mfa_secret) : req.session.mfaSetupSecret;
+    if (!isValidMfaToken(secret, token)) {
+      return res.status(401).json({ error: "Kode autentikator salah atau sudah kedaluwarsa." });
+    }
+
+    const isMfaSetup = !admin.mfa_enabled;
+    if (isMfaSetup) {
+      await pool.query(
+        "UPDATE admin SET mfa_secret = $1, mfa_enabled = TRUE WHERE id = $2 AND workspace_id = $3",
+        [encryptData(secret), admin.id, admin.workspace_id],
+      );
+    }
+    if (isMfaSetup) {
+      await new Promise((resolve, reject) => {
+        req.session.regenerate((error) => (error ? reject(error) : resolve()));
+      });
+      return res.json({ setupComplete: true });
+    }
+    await startSession(req, admin.id, admin.workspace_id);
+    res.json({ admin: { id: admin.id, name: admin.nama, email: admin.email }, workspaceId: admin.workspace_id });
+  } catch (error) {
+    console.error("MFA VERIFY ERROR:", error);
+    res.status(500).json({ error: "Gagal memverifikasi MFA." });
   }
 });
 
@@ -314,9 +445,9 @@ function ambilFiturReferensi(parsedDb) {
 }
 
 function handleBackendError(error, res) {
-  if (error.code === "ECONNREFUSED" && error.config?.url?.startsWith("http://127.0.0.1:8000/")) {
-    console.error("AI SERVICE ERROR: Layanan AI tidak aktif di http://127.0.0.1:8000");
-    return res.status(503).json({ error: "Layanan AI tidak aktif. Jalankan server AI di http://127.0.0.1:8000 lalu coba lagi." });
+  if (error.code === "ECONNREFUSED" && error.config?.url?.startsWith(`${AI_SERVICE_URL}/`)) {
+    console.error(`AI SERVICE ERROR: Layanan AI tidak aktif di ${AI_SERVICE_URL}`);
+    return res.status(503).json({ error: `Layanan AI tidak aktif. Jalankan server AI di ${AI_SERVICE_URL} lalu coba lagi.` });
   }
 
   console.error("Error backend:", error);
@@ -549,15 +680,11 @@ app.delete("/api/employees/:id", async (req, res) => {
 app.post("/api/register/preview", upload.single("image"), async (req, res) => {
   try {
     const angle = typeof req.body?.angle === "string" ? req.body.angle.trim() : "";
-    const allowedAngles = ["front", "left", "right"];
-    if (!req.file || !allowedAngles.includes(angle)) {
+    if (!req.file || !FACE_ANGLES.includes(angle)) {
       return res.status(400).json({ error: "Sudut wajah tidak valid atau gambar tidak tersedia" });
     }
 
-    const form = new FormData();
-    form.append("image", req.file.buffer, { filename: `${angle}.jpg`, contentType: "image/jpeg" });
-    const fastApiResponse = await axios.post("http://127.0.0.1:8000/extract-feature", form, { headers: form.getHeaders() });
-    const dataAI = fastApiResponse.data;
+    const dataAI = await extractFaceFeature(req.file.buffer, `${angle}.jpg`);
 
     if (dataAI.status !== "success") {
       return res.status(400).json({ error: `${angle}: ${dataAI.message || "Wajah tidak ditemukan"}` });
@@ -576,16 +703,14 @@ app.post("/api/register", upload.array("images", 3), async (req, res) => {
       return res.status(400).json({ error: "Nama dan tepat 3 gambar wajah wajib diisi" });
     }
 
-    const angles = ["front", "left", "right"];
     const references = [];
     for (let index = 0; index < req.files.length; index++) {
-      const form = new FormData();
-      form.append("image", req.files[index].buffer, { filename: `${angles[index]}.jpg`, contentType: "image/jpeg" });
-      const fastApiResponse = await axios.post("http://127.0.0.1:8000/extract-feature", form, { headers: form.getHeaders() });
-      if (fastApiResponse.data.status !== "success") {
-        return res.status(400).json({ error: `${angles[index]}: ${fastApiResponse.data.message || "Wajah tidak ditemukan"}` });
+      const angle = FACE_ANGLES[index];
+      const dataAI = await extractFaceFeature(req.files[index].buffer, `${angle}.jpg`);
+      if (dataAI.status !== "success") {
+        return res.status(400).json({ error: `${angle}: ${dataAI.message || "Wajah tidak ditemukan"}` });
       }
-      references.push({ angle: angles[index], feature: fastApiResponse.data.feature });
+      references.push({ angle, feature: dataAI.feature });
     }
 
     const cipherText = encryptData(JSON.stringify({ references }));
@@ -611,11 +736,7 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Tidak ada gambar" });
 
-    const form = new FormData();
-    form.append("image", req.file.buffer, { filename: "absen.jpg", contentType: "image/jpeg" });
-
-    const fastApiResponse = await axios.post("http://127.0.0.1:8000/extract-feature", form, { headers: form.getHeaders() });
-    const dataAI = fastApiResponse.data;
+    const dataAI = await extractFaceFeature(req.file.buffer, "absen.jpg");
 
     if (dataAI.status === "success") {
       const vektorAbsen = dataAI.feature;
@@ -718,7 +839,7 @@ app.post("/api/absen", upload.single("image"), async (req, res) => {
   }
 });
 
-const port = Number(process.env.PORT || 5000);
+const port = Number(requireEnv("PORT"));
 app.listen(port, () => {
   console.log(`Server 1 (Express + PostgreSQL + Kriptografi AES) menyala di port ${port}`);
 });

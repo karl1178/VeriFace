@@ -2,6 +2,9 @@ node_modules/
 frontend/dist/
 venv/
 __pycache__/
+.env
+.env.*
+!.env.example
 
 deploy_plans.md
 development_plans.md
