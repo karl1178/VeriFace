@@ -24,20 +24,26 @@ python -m venv venv
 venv\Scripts\python.exe -m pip install -r ai-service\requirements.txt
 ```
 
-Buat database PostgreSQL bernama `absensi_db`, lalu jalankan schema:
+Salin `.env.example` menjadi `.env`, lalu isi nilai rahasia dan koneksi
+PostgreSQL. Jangan commit file `.env`. Generate nilai acak untuk
+`ENCRYPTION_KEY` dan `SESSION_SECRET`, misalnya:
 
 ```powershell
-psql -U postgres -d absensi_db -f "backend\schema.sql"
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Secara default, backend menggunakan PostgreSQL di `localhost:5432` dengan:
+Simpan `ENCRYPTION_KEY` secara permanen setelah data terenkripsi dibuat.
+Mengganti nilai tersebut akan membuat data lama tidak dapat didekripsi.
 
-- user: `postgres`
-- password: `root`
-- database: `absensi_db`
+Buat database PostgreSQL sesuai `PGDATABASE`, lalu jalankan schema:
 
-Jika konfigurasi berbeda, atur environment variable `PGUSER`, `PGPASSWORD`,
-`PGHOST`, `PGPORT`, atau `PGDATABASE` sebelum menjalankan aplikasi.
+```powershell
+psql -U "$env:PGUSER" -d "$env:PGDATABASE" -f "backend\schema.sql"
+```
+
+Semua service membaca konfigurasi dari `.env` di root repository. `DATABASE_URL`
+dapat digunakan sebagai alternatif pengaturan `PG*`; `PGPASSWORD` tidak memiliki
+nilai default.
 
 ## Menjalankan aplikasi
 

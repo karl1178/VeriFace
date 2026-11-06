@@ -1,13 +1,32 @@
 @echo off
 title Veriface
+if not exist "%~dp0.env" (
+  echo File .env tidak ditemukan. Salin .env.example menjadi .env dan isi semua nilainya.
+  pause
+  exit /b 1
+)
+for /f "usebackq tokens=1,* delims==" %%A in ("%~dp0.env") do (
+  if "%%A"=="AI_SERVICE_URL" set "AI_SERVICE_URL=%%B"
+  if "%%A"=="FRONTEND_URL" set "FRONTEND_URL=%%B"
+)
+if not defined AI_SERVICE_URL (
+  echo AI_SERVICE_URL belum diatur di .env.
+  pause
+  exit /b 1
+)
+if not defined FRONTEND_URL (
+  echo FRONTEND_URL belum diatur di .env.
+  pause
+  exit /b 1
+)
 echo [1/3] Menyalakan Server AI (FastAPI)...
 start "Server AI (FastAPI)" /MIN cmd /k ""%~dp0venv\Scripts\python.exe" -m uvicorn main:app --app-dir "%~dp0ai-service""
 
 echo.
 echo Menunggu Server AI siap...
-powershell -NoProfile -Command "1..30 | ForEach-Object { try { Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8000/openapi.json' -TimeoutSec 1 | Out-Null; exit 0 } catch { Start-Sleep -Seconds 1 } }; exit 1"
+powershell -NoProfile -Command "1..30 | ForEach-Object { try { Invoke-WebRequest -UseBasicParsing -Uri '%AI_SERVICE_URL%/openapi.json' -TimeoutSec 1 | Out-Null; exit 0 } catch { Start-Sleep -Seconds 1 } }; exit 1"
 if errorlevel 1 (
-  echo Server AI tidak merespons di http://127.0.0.1:8000.
+  echo Server AI tidak merespons di %AI_SERVICE_URL%.
   echo Periksa jendela Server AI untuk melihat pesan error.
   pause
   exit /b 1
@@ -24,8 +43,8 @@ echo Menunggu server siap...
 timeout /t 3 >nul
 
 echo Membuka Browser...
-start http://localhost:5173/scanner
-start http://localhost:5173/dashboard
+start %FRONTEND_URL%/scanner
+start %FRONTEND_URL%/dashboard
 
 echo.
 echo Selesai! Semua server berjalan di latar (Minimize).

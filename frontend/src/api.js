@@ -1,4 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
+if (!API_URL) {
+  throw new Error("VITE_API_URL wajib diatur di file .env.");
+}
 
 export async function apiRequest(path, options) {
   let response;
@@ -9,12 +12,12 @@ export async function apiRequest(path, options) {
       headers: options?.headers,
     });
   } catch {
-    throw new Error("Tidak dapat terhubung ke backend. Pastikan server backend berjalan di http://localhost:5000.");
+    throw new Error(`Tidak dapat terhubung ke backend. Pastikan server backend berjalan di ${API_URL}.`);
   }
 
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
-    throw new Error("Backend tidak mengirim respons JSON. Pastikan backend VeriFace terbaru berjalan di http://localhost:5000, lalu muat ulang halaman.");
+    throw new Error(`Backend tidak mengirim respons JSON. Pastikan backend VeriFace terbaru berjalan di ${API_URL}, lalu muat ulang halaman.`);
   }
 
   let data;
