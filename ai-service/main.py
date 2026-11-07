@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 app = FastAPI()
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 
 def decode_image(contents: bytes) -> np.ndarray:
     image = cv2.imdecode(np.frombuffer(contents, np.uint8), cv2.IMREAD_UNCHANGED)
