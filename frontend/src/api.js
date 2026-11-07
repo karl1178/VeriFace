@@ -1,7 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL;
-if (!API_URL) {
-  throw new Error("VITE_API_URL wajib diatur di file .env.");
-}
+const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+const API_ORIGIN = API_URL || window.location.origin;
 
 export async function apiRequest(path, options) {
   let response;
@@ -12,12 +10,12 @@ export async function apiRequest(path, options) {
       headers: options?.headers,
     });
   } catch {
-    throw new Error(`Tidak dapat terhubung ke backend. Pastikan server backend berjalan di ${API_URL}.`);
+    throw new Error(`Tidak dapat terhubung ke backend. Pastikan server backend berjalan di ${API_ORIGIN}.`);
   }
 
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
-    throw new Error(`Backend tidak mengirim respons JSON. Pastikan backend VeriFace terbaru berjalan di ${API_URL}, lalu muat ulang halaman.`);
+    throw new Error(`Backend tidak mengirim respons JSON. Pastikan backend VeriFace terbaru berjalan di ${API_ORIGIN}, lalu muat ulang halaman.`);
   }
 
   let data;

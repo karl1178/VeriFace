@@ -110,6 +110,10 @@ app.use(session({
 }));
 const upload = multer({ storage: multer.memoryStorage() });
 
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 async function extractFaceFeature(buffer, filename) {
   const form = new FormData();
   form.append("image", buffer, { filename, contentType: "image/jpeg" });
